@@ -12,6 +12,9 @@
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <!-- Load an icon library (for copy, delete, upload icons) -->
     <script src="https://unpkg.com/lucide@0.363.0/dist/umd/lucide.min.js"></script>
+    <!-- Load QR Code Generator Library -->
+    <script src="https://cdn.jsdelivr.net/npm/qrcodegen@1.8.0/qrcodegen.min.js"></script>
+
 
     <style>
         /* Use Inconsolata font */
@@ -81,6 +84,25 @@
         /* Custom style for text history items */
         .history-item {
             word-break: break-all; /* Break long words/links */
+        }
+
+        /* QR Code Canvas */
+        #upload-qr-code {
+            border: 4px solid #00ff00; /* Green border */
+            background: white;
+        }
+
+        /* Progress Bar */
+        #progress-bar-container {
+            width: 100%;
+            background-color: #1a1a1a;
+            border: 1px solid #2a2a2a;
+        }
+        #progress-bar {
+            width: 0%;
+            height: 10px;
+            background-color: #00ff00; /* Bright green */
+            transition: width 0.1s linear;
         }
 
     </style>
@@ -156,10 +178,25 @@
                 <input type="file" id="file-upload" class="hidden">
                 <p class="text-xs text-lime-700 mt-2 text-center">Files are hosted on Gofile and expire after ~7 days.</p>
                 
-                <!-- Loading Spinner (for file upload) -->
-                <div id="upload-loader" class="hidden flex items-center justify-center space-x-2 text-lime-600 mt-4">
-                    <div class="spinner"></div>
-                    <span>Uploading...</span>
+                <!-- Upload Progress & Result -->
+                <div id="upload-status" class="hidden mt-4 space-y-3">
+                    <!-- Progress Bar -->
+                    <div id="progress-bar-container">
+                        <div id="progress-bar"></div>
+                    </div>
+                    <!-- Progress Stats -->
+                    <div id="progress-stats" class="flex justify-between text-xs text-lime-400">
+                        <span id="progress-percent">0%</span>
+                        <span id="progress-speed">-- MB/s</span>
+                        <span id="progress-eta">--:--</span>
+                    </div>
+                    <!-- Upload Result: Link & QR -->
+                    <div id="upload-result" class="hidden pt-4 border-t border-lime-900 space-y-3">
+                        <h3 class="text-sm font-semibold text-lime-300">Upload Complete!</h3>
+                        <a id="upload-link" href="#" target="_blank" class="block text-lime-400 hover:underline truncate"></a>
+                        <canvas id="upload-qr-code" class="mx-auto"></canvas>
+                        <button id="upload-dismiss-button" class="w-full text-xs text-lime-600 hover:text-lime-300 transition">Dismiss</button>
+                    </div>
                 </div>
 
                 <!-- File List -->
@@ -181,8 +218,7 @@
         const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxqZXNhYWhlZXJieHRrZW5vaXVnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjIxMDgyNzIsImV4cCI6MjA3NzY4NDI3Mn0.sLMbA51U0CMqvD7Xhgaln6OatbZJdenl0CDuUWg6fTY';
         
         // Initialize Supabase client
-        // ** FIX: Changed 'supabase.supabase' to just 'supabase' **
-        const { createClient } = supabase;
+        const { createClient } = supabase; // This line was fixed
         const _supabase = createClient(supabaseUrl, supabaseAnonKey);
 
         // --- Global State ---
@@ -194,7 +230,12 @@
         // --- DOM Elements ---
         let authContainer, appContainer, authButton, logoutButton, emailInput, passwordInput,
             authSubtitle, messageBox, newTextInput, syncTextButton, textHistoryContainer,
-            fileUploadInput, uploadLoader, fileListContainer, authPrompt, authToggleLink;
+            fileUploadInput, fileListContainer, authPrompt, authToggleLink,
+            uploadStatus, progressBarContainer, progressBar, progressPercent,
+            progressSpeed, progressEta, uploadResult, uploadLink, uploadQrCanvas, uploadDismissButton;
+
+        // --- QR Code Generator ---
+        const QrCode = qrcodegen.QrCode;
 
         // --- Helper Functions ---
 
@@ -265,6 +306,56 @@
             }
         }
 
+        /**
+         * Formats seconds into MM:SS
+         */
+        function formatTime(seconds) {
+            if (!isFinite(seconds) || seconds < 0) return '--:--';
+            const m = Math.floor(seconds / 60);
+            const s = Math.floor(seconds % 60);
+            return `${m}:${s < 10 ? '0' : ''}${s}`;
+        }
+
+        /**
+         * Formats bytes into MB/s
+         */
+        function formatSpeed(bytesPerSecond) {
+            if (!isFinite(bytesPerSecond) || bytesPerSecond < 0) return '-- MB/s';
+            const mbps = bytesPerSecond / 1024 / 1024;
+            return `${mbps.toFixed(2)} MB/s`;
+        }
+        
+        /**
+         * Draws a QR code to a canvas element
+         */
+        function drawQrCode(url, canvas) {
+            try {
+                const qr = QrCode.encodeText(url, QrCode.Ecc.MEDIUM);
+                const scale = 4;
+                const border = 2;
+                canvas.width = (qr.size + border * 2) * scale;
+                canvas.height = canvas.width;
+                const ctx = canvas.getContext("2d");
+                
+                // Fill background
+                ctx.fillStyle = "#ffffff";
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                
+                // Draw modules
+                ctx.fillStyle = "#0a0a0a"; // Dark module color
+                for (let y = 0; y < qr.size; y++) {
+                    for (let x = 0; x < qr.size; x++) {
+                        if (qr.getModule(x, y)) {
+                            ctx.fillRect((x + border) * scale, (y + border) * scale, scale, scale);
+                        }
+                    }
+                }
+            } catch (e) {
+                console.error("QR Code generation failed:", e);
+                canvas.classList.add('hidden');
+            }
+        }
+
         // --- Auth Logic ---
 
         /**
@@ -293,8 +384,6 @@
                 } else {
                     response = await _supabase.auth.signUp({ email, password });
                     if (response.error) throw response.error;
-                    // Supabase now requires email confirmation by default.
-                    // We'll log them in, but also show the confirmation message.
                     if (response.data.user && response.data.user.identities.length === 0) {
                         showMessage('User already exists. Please log in.', 'error');
                     } else {
@@ -305,7 +394,7 @@
                 if (response.error) {
                     throw response.error;
                 }
-
+                
                 // onAuthStateChanged will handle switching screens
             
             } catch (error) {
@@ -338,13 +427,11 @@
                 if (event === 'SIGNED_IN' && session) {
                     currentUser = session.user;
                     showScreen('app');
-                    // Start listening to data
                     fetchInitialData();
                     setupRealtimeSubscriptions();
                 } else if (event === 'SIGNED_OUT') {
                     currentUser = null;
                     showScreen('auth');
-                    // Stop listening to data
                     cleanupSubscriptions();
                     renderTexts([]);
                     renderFiles([]);
@@ -396,7 +483,6 @@
          */
         function setupRealtimeSubscriptions() {
             if (!currentUser) return;
-            // Clean up old subscriptions just in case
             cleanupSubscriptions();
 
             // Listen for text clips
@@ -609,59 +695,108 @@
         }
 
         /**
+         * Resets and hides the upload progress UI
+         */
+        function resetUploadUI() {
+            uploadStatus.classList.add('hidden');
+            uploadResult.classList.add('hidden');
+            progressBar.style.width = '0%';
+            progressPercent.textContent = '0%';
+            progressSpeed.textContent = '-- MB/s';
+            progressEta.textContent = '--:--';
+            uploadLink.href = '#';
+            uploadLink.textContent = '';
+            uploadQrCanvas.getContext('2d').clearRect(0, 0, uploadQrCanvas.width, uploadQrCanvas.height);
+            fileUploadInput.value = ''; // Reset input
+        }
+
+        /**
          * Handles uploading a file to Gofile and saving the link to Supabase
          */
         async function handleFileUpload(e) {
             const file = e.target.files[0];
             if (!file || !currentUser) return;
 
-            uploadLoader.classList.remove('hidden');
+            // Show and reset progress bar
+            uploadStatus.classList.remove('hidden');
+            uploadResult.classList.add('hidden');
+            progressBar.style.width = '0%';
+            progressPercent.textContent = '0%';
             showMessage('Uploading file to Gofile...', 'info');
 
             try {
-                // Gofile API v2 requires no server lookup, just a POST
-                // to a regional or the main upload endpoint.
-                
                 const formData = new FormData();
                 formData.append('file', file);
-                
-                // We use the main upload endpoint which auto-selects region
-                const uploadResponse = await fetch(`https://upload.gofile.io/uploadfile`, {
-                    method: 'POST',
-                    body: formData,
+
+                const xhr = new XMLHttpRequest();
+                const startTime = Date.now();
+
+                xhr.upload.addEventListener('progress', (event) => {
+                    if (event.lengthComputable) {
+                        const percentComplete = (event.loaded / event.total) * 100;
+                        const elapsedSeconds = (Date.now() - startTime) / 1000;
+                        const bytesPerSecond = event.loaded / elapsedSeconds;
+                        const etaSeconds = (event.total - event.loaded) / bytesPerSecond;
+
+                        progressBar.style.width = `${percentComplete.toFixed(0)}%`;
+                        progressPercent.textContent = `${percentComplete.toFixed(0)}%`;
+                        progressSpeed.textContent = formatSpeed(bytesPerSecond);
+                        progressEta.textContent = formatTime(etaSeconds);
+                    }
                 });
 
-                if (!uploadResponse.ok) {
-                    throw new Error(`Gofile upload failed: ${uploadResponse.status} ${uploadResponse.statusText}`);
-                }
+                xhr.addEventListener('load', async () => {
+                    if (xhr.status >= 200 && xhr.status < 300) {
+                        try {
+                            const uploadData = JSON.parse(xhr.responseText);
+                            if (uploadData.status !== 'ok') {
+                                throw new Error(`File upload failed: ${uploadData.data.error || 'Unknown error'}`);
+                            }
 
-                const uploadData = await uploadResponse.json();
-                
-                if (uploadData.status !== 'ok') {
-                    throw new Error(`File upload failed: ${uploadData.data.error || 'Unknown error'}`);
-                }
+                            // Show link and QR code immediately
+                            const downloadUrl = uploadData.data.downloadPage;
+                            uploadLink.href = downloadUrl;
+                            uploadLink.textContent = downloadUrl;
+                            drawQrCode(downloadUrl, uploadQrCanvas);
+                            uploadResult.classList.remove('hidden');
 
-                // 3. Save link to Supabase
-                const newFile = {
-                    file_name: uploadData.data.fileName,
-                    file_url: uploadData.data.downloadPage,
-                    user_id: currentUser.id
-                };
+                            // Save link to Supabase
+                            const newFile = {
+                                file_name: uploadData.data.fileName,
+                                file_url: downloadUrl,
+                                user_id: currentUser.id
+                            };
+                            const { error } = await _supabase.from('files').insert(newFile);
+                            if (error) throw error;
+                            
+                            showMessage('File uploaded and link synced!', 'success');
+                            // Realtime will handle rendering to the persistent list
 
-                const { error } = await _supabase.from('files').insert(newFile);
-                if (error) throw error;
-                
-                showMessage('File uploaded and link synced!', 'success');
-                // Realtime will handle rendering
+                        } catch (parseError) {
+                            console.error('File upload parse error:', parseError);
+                            showMessage(`Error: ${parseError.message}`, 'error');
+                        }
+                    } else {
+                        console.error('File upload HTTP error:', xhr.statusText);
+                        showMessage(`Gofile upload failed: ${xhr.status} ${xhr.statusText}`, 'error');
+                    }
+                });
+
+                xhr.addEventListener('error', () => {
+                    console.error('File upload network error.');
+                    showMessage('File upload failed. Check your network connection.', 'error');
+                });
+
+                xhr.open('POST', 'https://upload.gofile.io/uploadfile', true);
+                xhr.send(formData);
 
             } catch (error) {
                 console.error('File upload error:', error);
                 showMessage(`${error.message}`, 'error');
-            } finally {
-                uploadLoader.classList.add('hidden');
-                fileUploadInput.value = ''; // Reset input
+                resetUploadUI(); // Hide progress on failure
             }
         }
+
 
         /**
          * Deletes a file link from Supabase
@@ -705,10 +840,21 @@
             syncTextButton = document.getElementById('sync-text-button');
             textHistoryContainer = document.getElementById('text-history-container');
             fileUploadInput = document.getElementById('file-upload');
-            uploadLoader = document.getElementById('upload-loader');
             fileListContainer = document.getElementById('file-list');
             authPrompt = document.getElementById('auth-prompt');
             authToggleLink = document.getElementById('auth-toggle-link');
+            
+            // Upload UI
+            uploadStatus = document.getElementById('upload-status');
+            progressBarContainer = document.getElementById('progress-bar-container');
+            progressBar = document.getElementById('progress-bar');
+            progressPercent = document.getElementById('progress-percent');
+            progressSpeed = document.getElementById('progress-speed');
+            progressEta = document.getElementById('progress-eta');
+            uploadResult = document.getElementById('upload-result');
+            uploadLink = document.getElementById('upload-link');
+            uploadQrCanvas = document.getElementById('upload-qr-code');
+            uploadDismissButton = document.getElementById('upload-dismiss-button');
         }
 
         /**
@@ -733,6 +879,7 @@
                 });
                 syncTextButton.addEventListener('click', handleSyncNewText);
                 fileUploadInput.addEventListener('change', handleFileUpload);
+                uploadDismissButton.addEventListener('click', resetUploadUI);
                 
                 // Set up the main auth listener
                 setupAuthListener();
