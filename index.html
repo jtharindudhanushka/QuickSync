@@ -205,7 +205,6 @@
 
         let db, auth, userId;
         let firestoreUnsubscribe = null;
-        let textUpdateTimeout = null;
         
         // --- Encryption Key ---
         let encryptionKey = null;
@@ -348,7 +347,10 @@
          * Get the Firestore document reference for the current user's clipboard
          */
         function getClipboardDocRef() {
-            if (!db || !userId) return null;
+            if (!db || !userId) {
+                console.warn("getClipboardDocRef called without db or userId.");
+                return null;
+            }
             // Data is now private, stored by user ID.
             return doc(db, `artifacts/${appId}/private_clipboards/${userId}`);
         }
@@ -391,11 +393,10 @@
                 const userCredential = await signInWithEmailAndPassword(auth, email, password);
 
                 // SUCCESS: Derive key and proceed to app
+                // NOTE: We don't set userId here. onAuthStateChanged will handle it.
                 encryptionKey = await deriveKey(password, email);
-                userId = userCredential.user.uid; // Set userId from successful auth
                 
-                await setupClipboardListener();
-                showScreen('app');
+                // Let onAuthStateChanged handle the screen change and listener setup
 
             } catch (error) {
                 console.error("Auth Error:", error);
@@ -405,7 +406,6 @@
                 } else {
                     showMessage(error.message, 'error');
                 }
-            } finally {
                 authButton.disabled = false;
                 authButton.textContent = "Log In"; // Simplified
             }
@@ -417,7 +417,7 @@
         async function handleLogout() {
             try {
                 await signOut(auth);
-                // onAuthStateChanged will handle the rest
+                // onAuthStateChanged will handle the rest (clearing keys, screen change)
             } catch (error) {
                  console.error("Logout Error:", error);
                  showMessage(error.message, 'error');
@@ -429,7 +429,10 @@
          */
         async function setupClipboardListener() {
             const docRef = getClipboardDocRef();
-            if (!docRef) return;
+            if (!docRef) {
+                console.error("setupClipboardListener failed: No docRef.");
+                return; // Should not happen if userId is set
+            }
             
             if (firestoreUnsubscribe) {
                 firestoreUnsubscribe(); // Detach any old listener
@@ -667,7 +670,6 @@
 
             } catch (error) {
                 // Error is already handled by saveTexts
-                // showMessage("Error syncing text.", "error"); // This is redundant
             } finally {
                 syncTextButton.disabled = false;
                 syncTextButton.innerHTML = '<i data-lucide="send"></i><span>Sync to All Devices</span>';
@@ -827,7 +829,6 @@
                 showMessage('File link removed.', 'success');
             } catch (error) {
                 // Error is handled by saveFiles
-                // showMessage('Could not remove file link.', 'error'); // Redundant
             }
         }
 
@@ -870,15 +871,24 @@
 
                 // Main auth state listener
                 onAuthStateChanged(auth, async (user) => {
+                    // This is the updated logic
                     if (user && encryptionKey) {
                         // User is signed in AND we have the in-memory key. Good to go.
-                        userId = user.uid;
+                        userId = user.uid; // Set userId *first*
+                        
                         if (!firestoreUnsubscribe) {
-                           await setupClipboardListener();
+                            // Only setup listener *after* userId is set
+                            await setupClipboardListener();
                         }
                         showScreen('app');
+                        // Reset login button in case it was stuck on "Connecting..."
+                        if(authButton) {
+                            authButton.disabled = false;
+                            authButton.textContent = "Log In";
+                        }
                     } else if (user && !encryptionKey) {
                         // User is signed in (e.g., page reload) but we don't have the key.
+                        // This forces them to log in again to derive the key.
                         await signOut(auth);
                         showMessage('Please log in again to securely access your clipboard.', 'info');
                     } else {
