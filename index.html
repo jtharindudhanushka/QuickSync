@@ -1,0 +1,611 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>QuickSync Clip</title>
+    <!-- Load Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Load Inconsolata font (monospaced) -->
+    <link href="https://fonts.googleapis.com/css2?family=Inconsolata:wght@400;700&display=swap" rel="stylesheet">
+    <!-- Load an icon library (for copy, delete, upload icons) -->
+    <script src="https://unpkg.com/lucide-react@0.363.0/dist/umd/lucide.min.js"></script>
+
+    <style>
+        /* Use Inconsolata font */
+        body {
+            font-family: 'Inconsolata', monospace;
+            background-color: #0a0a0a; /* Darker background */
+            color: #00ff00; /* Bright green text */
+        }
+        
+        /* Scanline effect */
+        body::before {
+            content: "";
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background: repeating-linear-gradient(
+                0deg,
+                rgba(0, 0, 0, 0.5) 0px,
+                rgba(0, 0, 0, 0.5) 1px,
+                transparent 1px,
+                transparent 3px
+            );
+            pointer-events: none;
+            z-index: 999;
+        }
+
+        /* Custom styles for loading spinner */
+        .spinner {
+            border: 4px solid rgba(0, 255, 0, 0.3);
+            border-radius: 50%;
+            border-top: 4px solid #00ff00; /* Bright green */
+            width: 24px;
+            height: 24px;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        /* Custom styles for message box */
+        #message-box {
+            transition: all 0.3s ease-in-out;
+        }
+
+        /* Ensure lucide icons are sized correctly and colored */
+        .lucide {
+            width: 16px;
+            height: 16px;
+            stroke-width: 2;
+        }
+
+        /* Glow effect for headers */
+        h1, h2 {
+            text-shadow: 0 0 5px #00ff00;
+        }
+    </style>
+</head>
+<body class="min-h-screen flex items-center justify-center p-4">
+
+    <!-- 
+      App Wrapper 
+    -->
+    <div class="w-full max-w-2xl">
+
+        <!-- 
+          Login Screen 
+        -->
+        <div id="auth-container" class="bg-black p-8 shadow-xl border border-lime-900">
+            <h1 class="text-3xl font-bold text-center mb-2 text-lime-300">QuickSync Clip</h1>
+            <p class="text-center text-lime-600 mb-6">Enter credentials to access your clipboard.</p>
+            <div class="space-y-4">
+                <input type="text" id="clipboard-username-input" class="w-full p-3 bg-gray-900 border border-lime-800 text-lime-300 placeholder-lime-700 focus:outline-none focus:ring-2 focus:ring-lime-500 focus:border-lime-500" placeholder="Clipboard Username">
+                <input type="password" id="clipboard-password-input" class="w-full p-3 bg-gray-900 border border-lime-800 text-lime-300 placeholder-lime-700 focus:outline-none focus:ring-2 focus:ring-lime-500 focus:border-lime-500" placeholder="Clipboard Password">
+                <button id="login-button" class="w-full bg-lime-900 border border-lime-700 hover:bg-lime-700 text-lime-300 hover:text-black font-bold py-3 px-4 transition duration-200">
+                    Access Clipboard
+                </button>
+            </div>
+            <p class="text-xs text-lime-700 mt-4 text-center">This combination is your password. Choose a strong, unique password.</p>
+        </div>
+
+        <!-- 
+          Main App Screen (Hidden by default)
+        -->
+        <div id="app-container" class="hidden">
+            <!-- Header -->
+            <div class="flex justify-between items-center mb-4">
+                <h1 class="text-2xl font-bold text-lime-300">QuickSync Clip</h1>
+                <button id="logout-button" class="text-sm text-lime-600 hover:text-lime-300 transition">
+                    Lock (Logout)
+                </button>
+            </div>
+
+            <!-- Message Box for errors/info -->
+            <div id="message-box" class="hidden p-3 mb-4 text-sm border"></div>
+
+            <!-- Synced Text Area -->
+            <div class="bg-black p-6 shadow-xl mb-6 border border-lime-900">
+                <h2 class="text-lg font-semibold mb-3 text-lime-300">Synced Text</h2>
+                <textarea id="text-sync-area" class="w-full h-40 p-3 bg-gray-900 border border-lime-800 text-lime-300 placeholder-lime-700 resize-none focus:outline-none focus:ring-2 focus:ring-lime-500 focus:border-lime-500" placeholder="Paste text here... it will sync instantly."></textarea>
+                <div class="flex space-x-2 mt-3">
+                    <button id="copy-button" class="flex-1 bg-lime-900 border border-lime-700 hover:bg-lime-700 text-lime-300 hover:text-black font-semibold py-2 px-4 transition duration-200 flex items-center justify-center space-x-2">
+                        <i data-lucide="clipboard"></i>
+                        <span>Copy to Clipboard</span>
+                    </button>
+                    <button id="clear-button" class="bg-gray-800 border border-gray-600 hover:bg-gray-600 text-lime-300 hover:text-black font-semibold py-2 px-4 transition duration-200 flex items-center justify-center space-x-2">
+                        <i data-lucide="trash-2"></i>
+                        <span>Clear</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- File Upload and List -->
+            <div class="bg-black p-6 shadow-xl border border-lime-900">
+                <h2 class="text-lg font-semibold mb-3 text-lime-300">Synced Files</h2>
+                <!-- File Upload Input -->
+                <label for="file-upload" class="w-full bg-lime-900 border border-lime-700 hover:bg-lime-700 text-lime-300 hover:text-black font-bold py-3 px-4 transition duration-200 flex items-center justify-center space-x-2 cursor-pointer">
+                    <i data-lucide="upload-cloud"></i>
+                    <span>Upload New File</span>
+                </label>
+                <input type="file" id="file-upload" class="hidden">
+                <p class="text-xs text-lime-700 mt-2 text-center">Files are hosted on Gofile and expire after ~7 days.</p>
+                
+                <!-- Loading Spinner (for file upload) -->
+                <div id="upload-loader" class="hidden flex items-center justify-center space-x-2 text-lime-600 mt-4">
+                    <div class="spinner"></div>
+                    <span>Uploading...</span>
+                </div>
+
+                <!-- File List -->
+                <div id="file-list" class="mt-6 space-y-3">
+                    <!-- Files will be dynamically inserted here -->
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- 
+      Firebase and App Logic 
+    -->
+    <script type="module">
+        // Import Firebase modules
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { 
+            getAuth, 
+            signInAnonymously, 
+            signInWithCustomToken, 
+            onAuthStateChanged 
+        } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { 
+            getFirestore, 
+            doc, 
+            onSnapshot, 
+            setDoc, 
+            getDoc,
+            setLogLevel
+        } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        // --- Firebase Configuration ---
+        // These global variables are provided by the environment.
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-quicksync-app';
+        const firebaseConfig = {
+        apiKey: "AIzaSyCeuKPj5KehbknW1QE0h_BN_4seBTZAABc",
+        authDomain: "quicksync-clip.firebaseapp.com",
+        projectId: "quicksync-clip",
+        storageBucket: "quicksync-clip.firebasestorage.app",
+        messagingSenderId: "394694314783",
+        appId: "1:394694314783:web:24120f3f959811fedf7e2a"
+            };        
+        const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
+
+        let db, auth, userId;
+        let currentClipboardId = null;
+        let firestoreUnsubscribe = null;
+        let textUpdateTimeout = null;
+        let isUpdatingText = false; // Flag to prevent onSnapshot from overwriting user typing
+
+        // --- DOM Elements ---
+        const authContainer = document.getElementById('auth-container');
+        const appContainer = document.getElementById('app-container');
+        const loginButton = document.getElementById('login-button');
+        const logoutButton = document.getElementById('logout-button');
+        const clipboardUsernameInput = document.getElementById('clipboard-username-input');
+        const clipboardPasswordInput = document.getElementById('clipboard-password-input');
+        
+        const messageBox = document.getElementById('message-box');
+        
+        const textArea = document.getElementById('text-sync-area');
+        const copyButton = document.getElementById('copy-button');
+        const clearButton = document.getElementById('clear-button');
+        
+        const fileUploadInput = document.getElementById('file-upload');
+        const uploadLoader = document.getElementById('upload-loader');
+        const fileListContainer = document.getElementById('file-list');
+
+        // --- Helper Functions ---
+
+        /**
+         * Initialize Lucide icons
+         */
+        function initIcons() {
+            lucide.createIcons();
+        }
+
+        /**
+         * Show a message to the user
+         * @param {string} message - The text to display
+         * @param {'info' | 'error' | 'success'} type - The message type
+         */
+        function showMessage(message, type = 'info') {
+            messageBox.textContent = message;
+            // Clear all previous color classes
+            messageBox.classList.remove('hidden', 'bg-red-900', 'border-red-600', 'text-red-400', 'bg-green-900', 'border-green-600', 'text-green-400', 'bg-blue-900', 'border-blue-600', 'text-blue-400');
+            
+            if (type === 'error') {
+                messageBox.classList.add('bg-red-900', 'border-red-600', 'text-red-400');
+            } else if (type === 'success') {
+                messageBox.classList.add('bg-green-900', 'border-green-600', 'text-green-400');
+            } else {
+                messageBox.classList.add('bg-blue-900', 'border-blue-600', 'text-blue-400');
+            }
+            // Auto-hide after 5 seconds
+            setTimeout(() => {
+                messageBox.classList.add('hidden');
+            }, 5000);
+        }
+
+        /**
+         * Switch between login and app screens
+         * @param {'app' | 'auth'} screenName - The screen to show
+         */
+        function showScreen(screenName) {
+            if (screenName === 'app') {
+                authContainer.classList.add('hidden');
+                appContainer.classList.remove('hidden');
+            } else {
+                appContainer.classList.add('hidden');
+                authContainer.classList.remove('hidden');
+            }
+        }
+
+        /**
+         * Get the Firestore document reference for the current clipboard
+         */
+        function getClipboardDocRef() {
+            if (!db || !currentClipboardId) return null;
+            return doc(db, `artifacts/${appId}/public/data/clipboards/${currentClipboardId}`);
+        }
+
+        // --- App Logic ---
+
+        /**
+         * Hashes a string using SHA-256
+         * @param {string} message - The string to hash
+         * @returns {Promise<string>} The hex-encoded hash
+         */
+        async function sha256(message) {
+            const msgBuffer = new TextEncoder().encode(message);                    
+            const hashBuffer = await crypto.subtle.digest('SHA-256', msgBuffer);
+            const hashArray = Array.from(new Uint8Array(hashBuffer));
+            const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+            return hashHex;
+        }
+
+        /**
+         * Handles the login process
+         */
+        async function handleLogin() {
+            const username = clipboardUsernameInput.value;
+            const password = clipboardPasswordInput.value;
+            
+            if (username.length < 4) {
+                showMessage('Username must be at least 4 characters long.', 'error');
+                return;
+            }
+            if (password.length < 6) {
+                showMessage('Password must be at least 6 characters long.', 'error');
+                return;
+            }
+
+            // Create a unique, consistent hash from the credentials
+            const combinedId = `${username.toLowerCase().trim()}::${password}`;
+            currentClipboardId = await sha256(combinedId);
+            
+            clipboardUsernameInput.value = ''; // Clear fields
+            clipboardPasswordInput.value = '';
+            
+            sessionStorage.setItem('quicksync_clipboard_hash', currentClipboardId); // Remember hash for session
+            
+            await setupClipboardListener();
+            showScreen('app');
+        }
+
+        /**
+         * Handles the logout process
+         */
+        function handleLogout() {
+            if (firestoreUnsubscribe) {
+                firestoreUnsubscribe();
+                firestoreUnsubscribe = null;
+            }
+            currentClipboardId = null;
+            sessionStorage.removeItem('quicksync_clipboard_hash');
+            textArea.value = '';
+            fileListContainer.innerHTML = '';
+            showScreen('auth');
+        }
+
+        /**
+         * Sets up the real-time listener on the Firestore document
+         */
+        async function setupClipboardListener() {
+            const docRef = getClipboardDocRef();
+            if (!docRef) return;
+
+            firestoreUnsubscribe = onSnapshot(docRef, (docSnap) => {
+                if (docSnap.exists()) {
+                    const data = docSnap.data();
+                    // Update text area, only if not currently being typed in
+                    if (!isUpdatingText && document.activeElement !== textArea) {
+                        textArea.value = data.text || '';
+                    }
+                    renderFiles(data.files || []);
+                } else {
+                    // Document doesn't exist, it's a new clipboard
+                    textArea.value = '';
+                    renderFiles([]);
+                    showMessage('New clipboard created. Start pasting!', 'info');
+                }
+            }, (error) => {
+                console.error("Error listening to clipboard:", error);
+                showMessage('Error connecting to clipboard. Check ID or connection.', 'error');
+                handleLogout();
+            });
+        }
+
+        /**
+         * Renders the list of files
+         * @param {Array} files - Array of file objects from Firestore
+         */
+        function renderFiles(files) {
+            fileListContainer.innerHTML = ''; // Clear existing list
+            if (files.length === 0) {
+                fileListContainer.innerHTML = '<p class="text-sm text-lime-700 text-center">No files synced yet.</p>';
+                return;
+            }
+            
+            files.forEach(file => {
+                const fileElement = document.createElement('div');
+                fileElement.className = 'bg-gray-900 p-3 border-b border-lime-900 flex justify-between items-center';
+                
+                const link = document.createElement('a');
+                link.href = file.url;
+                link.target = '_blank';
+                link.className = 'text-lime-400 hover:underline truncate mr-4';
+                link.textContent = file.name;
+
+                const deleteButton = document.createElement('button');
+                deleteButton.className = 'text-red-500 hover:text-red-400 flex-shrink-0';
+                deleteButton.innerHTML = '<i data-lucide="trash-2" class="w-4 h-4"></i>';
+                deleteButton.onclick = () => handleDeleteFile(file.url);
+                
+                fileElement.appendChild(link);
+                fileElement.appendChild(deleteButton);
+                fileListContainer.appendChild(fileElement);
+            });
+            initIcons(); // Re-initialize icons for new elements
+        }
+
+        /**
+         * Handles changes to the text area (debounced)
+         */
+        function handleTextChange() {
+            isUpdatingText = true;
+            if (textUpdateTimeout) {
+                clearTimeout(textUpdateTimeout);
+            }
+            
+            textUpdateTimeout = setTimeout(async () => {
+                const newText = textArea.value;
+                const docRef = getClipboardDocRef();
+                if (!docRef) return;
+                
+                try {
+                    await setDoc(docRef, { text: newText }, { merge: true });
+                } catch (error) {
+                    console.error("Error updating text:", error);
+                    showMessage('Error syncing text.', 'error');
+                } finally {
+                    isUpdatingText = false;
+                }
+            }, 300); // 300ms debounce
+        }
+
+        /**
+         * Copies text from the text area to the user's clipboard
+         */
+        function handleCopyText() {
+            // Use execCommand as a fallback for iframe environments
+            try {
+                textArea.select();
+                document.execCommand('copy');
+                showMessage('Text copied to clipboard!', 'success');
+            } catch (err) {
+                console.error('Fallback: Oops, unable to copy', err);
+                showMessage('Could not copy text.', 'error');
+            }
+        }
+
+        /**
+         * Clears the synced text
+         */
+        async function handleClearText() {
+            textArea.value = '';
+            handleTextChange(); // Trigger sync
+        }
+
+        /**
+         * Handles the file upload process
+         * @param {Event} e - The file input change event
+         */
+        async function handleFileUpload(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            uploadLoader.classList.remove('hidden');
+            showMessage('Uploading file...', 'info');
+
+            try {
+                // 1. Get Gofile server
+                const serverResponse = await fetch('https://api.gofile.io/getServer');
+                const serverData = await serverResponse.json();
+                
+                if (serverData.status !== 'ok') {
+                    throw new Error('Could not find Gofile server.');
+                }
+                const server = serverData.data.server;
+
+                // 2. Upload file
+                const formData = new FormData();
+                formData.append('file', file);
+
+                const uploadResponse = await fetch(`https://${server}.gofile.io/uploadFile`, {
+                    method: 'POST',
+                    body: formData,
+                });
+                const uploadData = await uploadResponse.json();
+
+                if (uploadData.status !== 'ok') {
+                    throw new Error('File upload failed.');
+                }
+
+                // 3. Add file to Firestore
+                const newFile = {
+                    name: uploadData.data.fileName,
+                    url: uploadData.data.downloadPage,
+                    uploadedAt: new Date().toISOString()
+                };
+
+                const docRef = getClipboardDocRef();
+                const docSnap = await getDoc(docRef);
+                const currentFiles = (docSnap.exists() && docSnap.data().files) ? docSnap.data().files : [];
+                
+                // Add new file to the top of the list
+                const updatedFiles = [newFile, ...currentFiles];
+
+                await setDoc(docRef, { files: updatedFiles }, { merge: true });
+                
+                showMessage('File uploaded successfully!', 'success');
+
+            } catch (error) {
+                console.error('File upload error:', error);
+                showMessage(`File upload failed: ${error.message}`, 'error');
+            } finally {
+                uploadLoader.classList.add('hidden');
+                fileUploadInput.value = ''; // Reset input
+            }
+        }
+
+        /**
+         * Deletes a file from the Firestore list (not from Gofile)
+         * @param {string} fileUrl - The URL of the file to delete
+         */
+        async function handleDeleteFile(fileUrl) {
+            // We can't use a standard confirm() box in this environment.
+            // For simplicity, we'll just ask in the message box.
+            // A proper implementation would use a custom modal.
+            showMessage('Click again to confirm deletion.', 'error');
+            
+            // Re-bind the click to a new confirm function
+            const deleteButton = event.target.closest('button');
+            if (!deleteButton.dataset.confirmed) {
+                 deleteButton.dataset.confirmed = "true";
+                 deleteButton.onclick = ()_=> {
+                    performDelete(fileUrl);
+                 }
+                 // Reset after 3 seconds if not clicked
+                 setTimeout(()_=> {
+                     deleteButton.dataset.confirmed = "false";
+                     deleteButton.onclick = () => handleDeleteFile(fileUrl);
+                 }, 3000);
+                 return;
+            }
+        }
+        
+        async function performDelete(fileUrl) {
+             try {
+                const docRef = getClipboardDocRef();
+                const docSnap = await getDoc(docRef);
+                
+                if (!docSnap.exists()) return;
+
+                const currentFiles = docSnap.data().files || [];
+                const updatedFiles = currentFiles.filter(file => file.url !== fileUrl);
+
+                await setDoc(docRef, { files: updatedFiles }, { merge: true });
+                showMessage('File link removed.', 'success');
+            } catch (error)
+                {
+                console.error('Error removing file link:', error);
+                showMessage('Could not remove file link.', 'error');
+            }
+        }
+
+        // --- Initialization ---
+
+        /**
+         * Main function to initialize the app
+         */
+        async function main() {
+            if (!firebaseConfig.apiKey) {
+                document.body.innerHTML = '<h1 class="text-red-500 text-center p-8">Firebase configuration is missing. This app cannot run.</h1>';
+                return;
+            }
+
+            try {
+                const app = initializeApp(firebaseConfig);
+                db = getFirestore(app);
+                auth = getAuth(app);
+                setLogLevel('Debug'); // Enable Firestore logging
+
+                // Listen for auth state changes
+                onAuthStateChanged(auth, async (user) => {
+                    if (user) {
+                        userId = user.uid;
+                        console.log('User is authenticated:', userId);
+                        
+                        // Check if we have a clipboard ID in session storage
+                        const sessionClipboardId = sessionStorage.getItem('quicksync_clipboard_hash');
+                        if (sessionClipboardId) {
+                            currentClipboardId = sessionClipboardId;
+                            await setupClipboardListener();
+                            showScreen('app');
+                        } else {
+                            showScreen('auth');
+                        }
+                        
+                    } else {
+                        // No user, sign in
+                        if (initialAuthToken) {
+                            await signInWithCustomToken(auth, initialAuthToken);
+                        } else {
+                            await signInAnonymously(auth);
+                        }
+                    }
+                });
+
+                // Attach event listeners
+                loginButton.addEventListener('click', handleLogin);
+                logoutButton.addEventListener('click', handleLogout);
+                
+                textArea.addEventListener('input', handleTextChange);
+                copyButton.addEventListener('click', handleCopyText);
+                clearButton.addEventListener('click', handleClearText);
+                
+                fileUploadInput.addEventListener('change', handleFileUpload);
+                
+                // Make delete function global for inline onclick
+                window.handleDeleteFile = handleDeleteFile;
+                window.performDelete = performDelete; // Make helper global too
+
+                initIcons();
+
+            } catch (error) {
+                console.error("Initialization Error:", error);
+                document.body.innerHTML = `<h1 class="text-red-500 text-center p-8">Error initializing app: ${error.message}</h1>`;
+            }
+        }
+
+        main();
+
+    </script>
+</body>
+</html>
+
+
