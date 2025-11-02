@@ -19,24 +19,7 @@
             color: #00ff00; /* Bright green text */
         }
         
-        /* Scanline effect */
-        body::before {
-            content: "";
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100vw;
-            height: 100vh;
-            background: repeating-linear-gradient(
-                0deg,
-                rgba(0, 0, 0, 0.5) 0px,
-                rgba(0, 0, 0, 0.5) 1px,
-                transparent 1px,
-                transparent 3px
-            );
-            pointer-events: none;
-            z-index: 999;
-        }
+        /* Removed the scanline effect */
 
         /* Custom styles for loading spinner */
         .spinner {
@@ -75,6 +58,31 @@
             text-decoration: underline;
             cursor: pointer;
         }
+
+        /* Typewriter effect for title */
+        .typewriter-effect {
+            width: 15ch; /* 15 chars for "QuickSync Clip" */
+            overflow: hidden;
+            white-space: nowrap;
+            border-right: .1em solid #00ff00;
+            animation: typing 2.5s steps(15), blink-caret .75s step-end infinite;
+        }
+        
+        @keyframes typing {
+            from { width: 0 }
+            to { width: 15ch }
+        }
+
+        @keyframes blink-caret {
+            from, to { border-color: transparent }
+            50% { border-color: #00ff00; }
+        }
+
+        /* Custom style for text history items */
+        .history-item {
+            word-break: break-all; /* Break long words/links */
+        }
+
     </style>
 </head>
 <body class="min-h-screen flex items-center justify-center p-4">
@@ -88,7 +96,7 @@
           Login/Register Screen 
         -->
         <div id="auth-container" class="bg-black p-8 shadow-xl border border-lime-900">
-            <h1 class="text-3xl font-bold text-center mb-2 text-lime-300">QuickSync Clip</h1>
+            <h1 class="typewriter-effect text-3xl font-bold text-center mb-2 text-lime-300 mx-auto">QuickSync Clip</h1>
             <p id="auth-subtitle" class="text-center text-lime-600 mb-6">Log in to access your secure clipboard.</p>
             <div class="space-y-4">
                 <input type="email" id="email-input" class="w-full p-3 bg-gray-900 border border-lime-800 text-lime-300 placeholder-lime-700 focus:outline-none focus:ring-2 focus:ring-lime-500 focus:border-lime-500" placeholder="Email">
@@ -97,10 +105,7 @@
                     Log In
                 </button>
             </div>
-            <p class="text-xs text-lime-700 mt-4 text-center">
-                <span id="auth-toggle-text">Need an account?</span>
-                <a id="auth-toggle-link" class="auth-toggle">Register here.</a>
-            </p>
+
         </div>
 
         <!-- 
@@ -109,7 +114,7 @@
         <div id="app-container" class="hidden">
             <!-- Header -->
             <div class="flex justify-between items-center mb-4">
-                <h1 class="text-2xl font-bold text-lime-300">QuickSync Clip</h1>
+                <h1 class="typewriter-effect text-2xl font-bold text-lime-300" style="margin: 0; width: 15ch;">QuickSync Clip</h1>
                 <button id="logout-button" class="text-sm text-lime-600 hover:text-lime-300 transition">
                     Logout
                 </button>
@@ -118,21 +123,27 @@
             <!-- Message Box for errors/info -->
             <div id="message-box" class="hidden p-3 mb-4 text-sm border"></div>
 
-            <!-- Synced Text Area -->
+            <!-- New Text Sync Area -->
             <div class="bg-black p-6 shadow-xl mb-6 border border-lime-900">
-                <h2 class="text-lg font-semibold mb-3 text-lime-300">Encrypted Text</h2>
-                <textarea id="text-sync-area" class="w-full h-40 p-3 bg-gray-900 border border-lime-800 text-lime-300 placeholder-lime-700 resize-none focus:outline-none focus:ring-2 focus:ring-lime-500 focus:border-lime-500" placeholder="Paste text here... it will be encrypted and synced."></textarea>
-                <div class="flex space-x-2 mt-3">
-                    <button id="copy-button" class="flex-1 bg-lime-900 border border-lime-700 hover:bg-lime-700 text-lime-300 hover:text-black font-semibold py-2 px-4 transition duration-200 flex items-center justify-center space-x-2">
-                        <i data-lucide="clipboard"></i>
-                        <span>Copy to Clipboard</span>
-                    </button>
-                    <button id="clear-button" class="bg-gray-800 border border-gray-600 hover:bg-gray-600 text-lime-300 hover:text-black font-semibold py-2 px-4 transition duration-200 flex items-center justify-center space-x-2">
-                        <i data-lucide="trash-2"></i>
-                        <span>Clear</span>
-                    </button>
-                </div>
+                <h2 class="text-lg font-semibold mb-3 text-lime-300">Sync New Text</h2>
+                <textarea id="new-text-input" class="w-full h-24 p-3 bg-gray-900 border border-lime-800 text-lime-300 placeholder-lime-700 resize-none focus:outline-none focus:ring-2 focus:ring-lime-500 focus:border-lime-500" placeholder="Paste text here to sync..."></textarea>
+                <button id="sync-text-button" class="w-full mt-3 bg-lime-900 border border-lime-700 hover:bg-lime-700 text-lime-300 hover:text-black font-semibold py-2 px-4 transition duration-200 flex items-center justify-center space-x-2">
+                    <i data-lucide="send"></i>
+                    <span>Sync to All Devices</span>
+                </button>
             </div>
+
+            <!-- Synced Text History -->
+            <div class="bg-black p-6 shadow-xl mb-6 border border-lime-900">
+                <h2 class="text-lg font-semibold mb-3 text-lime-300">Synced History (Newest First)</h2>
+                <div id="text-history-container" class="space-y-3">
+                    <!-- Text history items will be dynamically inserted here -->
+                </div>
+                <button id="load-more-texts" class="w-full mt-4 bg-gray-800 border border-gray-600 hover:bg-gray-600 text-lime-300 hover:text-black font-semibold py-2 px-4 transition duration-200 hidden">
+                    Load More
+                </button>
+            </div>
+
 
             <!-- File Upload and List -->
             <div class="bg-black p-6 shadow-xl border border-lime-900">
@@ -197,11 +208,14 @@
         let db, auth, userId;
         let firestoreUnsubscribe = null;
         let textUpdateTimeout = null;
-        let isUpdatingText = false; // Flag to prevent onSnapshot from overwriting user typing
-
+        
         // --- Encryption Key ---
-        // This key is derived from the user's password on login and is ONLY stored in memory.
         let encryptionKey = null;
+
+        // --- State for Text History ---
+        let allSyncedTexts = [];
+        let displayedTextCount = 0;
+        const TEXTS_PER_PAGE = 5;
 
         // --- DOM Elements ---
         const authContainer = document.getElementById('auth-container');
@@ -217,9 +231,10 @@
         
         const messageBox = document.getElementById('message-box');
         
-        const textArea = document.getElementById('text-sync-area');
-        const copyButton = document.getElementById('copy-button');
-        const clearButton = document.getElementById('clear-button');
+        const newTextInput = document.getElementById('new-text-input');
+        const syncTextButton = document.getElementById('sync-text-button');
+        const textHistoryContainer = document.getElementById('text-history-container');
+        const loadMoreTextsButton = document.getElementById('load-more-texts');
         
         const fileUploadInput = document.getElementById('file-upload');
         const uploadLoader = document.getElementById('upload-loader');
@@ -246,9 +261,6 @@
 
         /**
          * Derives an AES-GCM encryption key from a password and salt.
-         * @param {string} password - The user's password.
-         * @param {string} salt - A unique salt (we'll use the user's email).
-         * @returns {Promise<CryptoKey>} The derived CryptoKey.
          */
         async function deriveKey(password, salt) {
             const enc = new TextEncoder();
@@ -275,9 +287,6 @@
 
         /**
          * Encrypts plaintext with the derived key.
-         * @param {string} text - The plaintext to encrypt.
-         * @param {CryptoKey} key - The AES-GCM key.
-         * @returns {Promise<Object>} An object with base64-encoded iv and ciphertext.
          */
         async function encrypt(text, key) {
             const iv = crypto.getRandomValues(new Uint8Array(12)); // 96-bit IV
@@ -294,9 +303,6 @@
 
         /**
          * Decrypts ciphertext with the derived key.
-         * @param {Object} data - An object with base64-encoded iv and ciphertext.
-         * @param {CryptoKey} key - The AES-GCM key.
-         * @returns {Promise<string>} The decrypted plaintext.
          */
         async function decrypt(data, key) {
             if (!data || !data.iv || !data.ciphertext) {
@@ -321,8 +327,6 @@
 
         /**
          * Show a message to the user
-         * @param {string} message - The text to display
-         * @param {'info' | 'error' | 'success'} type - The message type
          */
         function showMessage(message, type = 'info') {
             messageBox.textContent = message.replace('Firebase: ', ''); // Make errors user-friendly
@@ -347,7 +351,6 @@
 
         /**
          * Switch between login and app screens
-         * @param {'app' | 'auth'} screenName - The screen to show
          */
         function showScreen(screenName) {
             if (screenName === 'app') {
@@ -441,7 +444,6 @@
             try {
                 await signOut(auth);
                 // onAuthStateChanged will handle the rest
-                // (clearing state, showing auth screen)
             } catch (error) {
                  console.error("Logout Error:", error);
                  showMessage(error.message, 'error');
@@ -468,12 +470,14 @@
                 if (docSnap.exists()) {
                     const data = docSnap.data();
                     try {
-                        // Decrypt Text
-                        if (data.text && !isUpdatingText && document.activeElement !== textArea) {
-                            const decryptedText = await decrypt(data.text, encryptionKey);
-                            textArea.value = decryptedText;
-                        } else if (!data.text) {
-                            textArea.value = '';
+                        // Decrypt Texts
+                        if (data.texts) {
+                            const decryptedTextsJson = await decrypt(data.texts, encryptionKey);
+                            allSyncedTexts = JSON.parse(decryptedTextsJson || "[]");
+                            renderTexts(true); // Reset and render
+                        } else {
+                            allSyncedTexts = [];
+                            renderTexts(true); // Reset and render
                         }
 
                         // Decrypt Files
@@ -486,12 +490,12 @@
                     } catch (e) {
                         console.error("Decryption error:", e);
                         showMessage("Error decrypting data. Wrong password? Data corrupted?", 'error');
-                        // Corrupt data or wrong key. Logout to force re-key.
                         handleLogout();
                     }
                 } else {
                     // Document doesn't exist, it's a new clipboard
-                    textArea.value = '';
+                    allSyncedTexts = [];
+                    renderTexts(true);
                     renderFiles([]);
                     showMessage('New secure clipboard ready. Start pasting!', 'info');
                 }
@@ -503,8 +507,92 @@
         }
 
         /**
+         * Renders the list of synced text items
+         * @param {boolean} reset - If true, clears the list and starts from page 1.
+         */
+        function renderTexts(reset = false) {
+            if (reset) {
+                textHistoryContainer.innerHTML = '';
+                displayedTextCount = 0;
+            }
+
+            if (allSyncedTexts.length === 0) {
+                textHistoryContainer.innerHTML = '<p class="text-sm text-lime-700 text-center">No text synced yet.</p>';
+                loadMoreTextsButton.classList.add('hidden');
+                return;
+            }
+
+            const startIndex = displayedTextCount;
+            const endIndex = Math.min(startIndex + TEXTS_PER_PAGE, allSyncedTexts.length);
+            
+            for (let i = startIndex; i < endIndex; i++) {
+                const text = allSyncedTexts[i];
+                const item = document.createElement('div');
+                item.className = 'bg-gray-900 p-3 border-b border-lime-900 flex justify-between items-start space-x-3';
+                
+                const textContent = document.createElement('pre');
+                textContent.className = 'text-lime-400 text-sm whitespace-pre-wrap history-item';
+                textContent.textContent = text;
+                
+                const copyBtn = document.createElement('button');
+                copyBtn.className = 'text-lime-600 hover:text-lime-300 flex-shrink-0';
+                copyBtn.innerHTML = '<i data-lucide="clipboard" class="w-4 h-4"></i>';
+                copyBtn.onclick = () => {
+                    try {
+                        navigator.clipboard.writeText(text).then(() => {
+                            showMessage('Copied to clipboard!', 'success');
+                        }, (err) => {
+                            // Fallback for http or other issues
+                            fallbackCopyTextToClipboard(text);
+                        });
+                    } catch (e) {
+                         fallbackCopyTextToClipboard(text);
+                    }
+                };
+
+                item.appendChild(textContent);
+                item.appendChild(copyBtn);
+                textHistoryContainer.appendChild(item);
+            }
+
+            displayedTextCount = endIndex;
+
+            // Show/Hide "Load More" button
+            if (displayedTextCount < allSyncedTexts.length) {
+                loadMoreTextsButton.classList.remove('hidden');
+            } else {
+                loadMoreTextsButton.classList.add('hidden');
+            }
+
+            initIcons(); // Re-initialize icons
+        }
+        
+        function fallbackCopyTextToClipboard(text) {
+             try {
+                const textArea = document.createElement("textarea");
+                textArea.value = text;
+                
+                // Avoid scrolling to bottom
+                textArea.style.top = "0";
+                textArea.style.left = "0";
+                textArea.style.position = "fixed";
+
+                document.body.appendChild(textArea);
+                textArea.focus();
+                textArea.select();
+
+                document.execCommand('copy');
+                showMessage('Copied to clipboard!', 'success');
+                document.body.removeChild(textArea);
+            } catch (err) {
+                console.error('Fallback: Oops, unable to copy', err);
+                showMessage('Could not copy text.', 'error');
+            }
+        }
+
+
+        /**
          * Renders the list of files
-         * @param {Array} files - Array of file objects
          */
         function renderFiles(files) {
             fileListContainer.innerHTML = ''; // Clear existing list
@@ -536,51 +624,74 @@
         }
 
         /**
-         * Encrypts and saves the text area content (debounced)
+         * Gets the current decrypted text list from Firestore
          */
-        function handleTextChange() {
-            isUpdatingText = true;
-            if (textUpdateTimeout) {
-                clearTimeout(textUpdateTimeout);
-            }
+        async function getCurrentTexts() {
+            const docRef = getClipboardDocRef();
+            if (!docRef || !encryptionKey) return [];
             
-            textUpdateTimeout = setTimeout(async () => {
-                const newText = textArea.value;
-                const docRef = getClipboardDocRef();
-                if (!docRef || !encryptionKey) return;
-                
+            const docSnap = await getDoc(docRef);
+            if (docSnap.exists() && docSnap.data().texts) {
                 try {
-                    const encryptedData = await encrypt(newText, encryptionKey);
-                    await setDoc(docRef, { text: encryptedData }, { merge: true });
-                } catch (error) {
-                    console.error("Error updating text:", error);
-                    showMessage('Error syncing text.', 'error');
-                } finally {
-                    isUpdatingText = false;
+                    const decryptedTextsJson = await decrypt(docSnap.data().texts, encryptionKey);
+                    return JSON.parse(decryptedTextsJson || "[]");
+                } catch (e) {
+                    console.error("Text list decryption failed:", e);
+                    showMessage("Could not read text history.", 'error');
+                    return [];
                 }
-            }, 300); // 300ms debounce
+            }
+            return [];
         }
 
         /**
-         * Copies text from the text area to the user's clipboard
+         * Encrypts and saves the entire text list
          */
-        function handleCopyText() {
+        async function saveTexts(texts) {
+            const docRef = getClipboardDocRef();
+            if (!docRef || !encryptionKey) return;
+            
             try {
-                textArea.select();
-                document.execCommand('copy');
-                showMessage('Text copied to clipboard!', 'success');
-            } catch (err) {
-                console.error('Fallback: Oops, unable to copy', err);
-                showMessage('Could not copy text.', 'error');
+                const textsJson = JSON.stringify(texts);
+                const encryptedTexts = await encrypt(textsJson, encryptionKey);
+                await setDoc(docRef, { texts: encryptedTexts }, { merge: true });
+            } catch (error) {
+                console.error("Error saving text list:", error);
+                showMessage("Could not save text list.", 'error');
             }
         }
 
         /**
-         * Clears the synced text (and encrypts the empty string)
+         * Handles syncing new text
          */
-        async function handleClearText() {
-            textArea.value = '';
-            handleTextChange(); // Trigger sync
+        async function handleSyncNewText() {
+            const newText = newTextInput.value;
+            if (newText.trim().length === 0) {
+                showMessage("Cannot sync empty text.", "error");
+                return;
+            }
+
+            syncTextButton.disabled = true;
+            syncTextButton.textContent = "Syncing...";
+
+            try {
+                const currentTexts = await getCurrentTexts();
+                currentTexts.unshift(newText); // Prepend new text
+                const updatedTexts = currentTexts.slice(0, 50); // Keep only 50 most recent
+                
+                await saveTexts(updatedTexts);
+                
+                newTextInput.value = ''; // Clear input
+                showMessage("Text synced!", "success");
+
+            } catch (error) {
+                console.error("Error syncing text:", error);
+                showMessage("Error syncing text.", "error");
+            } finally {
+                syncTextButton.disabled = false;
+                syncTextButton.innerHTML = '<i data-lucide="send"></i><span>Sync to All Devices</span>';
+                initIcons();
+            }
         }
 
         /**
@@ -606,7 +717,6 @@
 
         /**
          * Encrypts and saves the entire file list
-         * @param {Array} files - The array of file objects
          */
         async function saveFiles(files) {
             const docRef = getClipboardDocRef();
@@ -624,7 +734,6 @@
 
         /**
          * Handles the file upload process
-         * @param {Event} e - The file input change event
          */
         async function handleFileUpload(e) {
             const file = e.target.files[0];
@@ -636,7 +745,15 @@
             try {
                 // 1. Get Gofile server
                 const serverResponse = await fetch('https://api.gofile.io/getServer');
-                const serverData = await serverResponse.json();
+                if (!serverResponse.ok) {
+                    throw new Error(`Gofile server lookup failed: ${serverResponse.status}`);
+                }
+                let serverData;
+                try {
+                    serverData = await serverResponse.json();
+                } catch (jsonError) {
+                    throw new Error('Gofile server returned invalid response. API may be down.');
+                }
                 
                 if (serverData.status !== 'ok') {
                     throw new Error('Could not find Gofile server.');
@@ -651,10 +768,25 @@
                     method: 'POST',
                     body: formData,
                 });
-                const uploadData = await uploadResponse.json();
+
+                if (!uploadResponse.ok) {
+                    throw new Error(`Gofile upload failed: ${uploadResponse.status}`);
+                }
+                let uploadData;
+                try {
+                    uploadData = await uploadResponse.json();
+                } catch (jsonError) {
+                    const textResponse = await uploadResponse.text();
+                    console.error("Gofile invalid JSON response:", textResponse);
+                    // This is where the user's error comes from
+                    if (textResponse.includes("error-notFound")) {
+                        throw new Error('Gofile upload failed: Server error (notFound). Please try again.');
+                    }
+                    throw new Error('Gofile upload returned invalid response. API may be down.');
+                }
 
                 if (uploadData.status !== 'ok') {
-                    throw new Error('File upload failed.');
+                    throw new Error(`File upload failed: ${uploadData.data.error || 'Unknown error'}`);
                 }
 
                 // 3. Add encrypted file link to Firestore
@@ -670,9 +802,10 @@
                 
                 showMessage('File uploaded and link encrypted!', 'success');
 
-            } catch (error) {
+            } catch (error)
+            {
                 console.error('File upload error:', error);
-                showMessage(`File upload failed: ${error.message}`, 'error');
+                showMessage(`${error.message}`, 'error');
             } finally {
                 uploadLoader.classList.add('hidden');
                 fileUploadInput.value = ''; // Reset input
@@ -681,7 +814,6 @@
 
         /**
          * Deletes a file from the encrypted list
-         * @param {string} fileUrl - The URL of the file to delete
          */
         async function handleDeleteFile(fileUrl) {
             showMessage('Click again to confirm deletion.', 'error');
@@ -693,8 +825,10 @@
                     performDelete(fileUrl);
                  }
                  setTimeout(() => {
-                     deleteButton.dataset.confirmed = "false";
-                     deleteButton.onclick = () => handleDeleteFile(fileUrl);
+                     if(deleteButton) { // Check if element still exists
+                        deleteButton.dataset.confirmed = "false";
+                        deleteButton.onclick = () => handleDeleteFile(fileUrl);
+                     }
                  }, 3000);
                  return;
             }
@@ -735,9 +869,7 @@
                         showScreen('app');
                     } else if (user && !encryptionKey) {
                         // User is signed in (e.g., page reload) but we don't have the key.
-                        // Force a logout to make them re-authenticate and derive the key.
                         await signOut(auth);
-                        // The 'else' block will catch the new 'null' user state.
                         showMessage('Please log in again to securely access your clipboard.', 'info');
                     } else {
                         // No user is signed in.
@@ -748,8 +880,11 @@
                             firestoreUnsubscribe = null;
                         }
                         showScreen('auth');
-                        textArea.value = '';
-                        fileListContainer.innerHTML = '';
+                        // Clear all state
+                        allSyncedTexts = [];
+                        renderTexts(true);
+                        renderFiles([]);
+                        newTextInput.value = '';
                     }
                 });
 
@@ -758,9 +893,8 @@
                 authToggleLink.addEventListener('click', toggleAuthMode);
                 logoutButton.addEventListener('click', handleLogout);
                 
-                textArea.addEventListener('input', handleTextChange);
-                copyButton.addEventListener('click', handleCopyText);
-                clearButton.addEventListener('click', handleClearText);
+                syncTextButton.addEventListener('click', handleSyncNewText);
+                loadMoreTextsButton.addEventListener('click', () => renderTexts(false)); // false = don't reset
                 
                 fileUploadInput.addEventListener('change', handleFileUpload);
                 
@@ -781,5 +915,4 @@
     </script>
 </body>
 </html>
-
 
