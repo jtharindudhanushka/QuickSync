@@ -8,6 +8,8 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Load Inconsolata font (monospaced) -->
     <link href="https://fonts.googleapis.com/css2?family=Inconsolata:wght@400;700&display=swap" rel="stylesheet">
+    <!-- Load Supabase Client -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <!-- Load an icon library (for copy, delete, upload icons) -->
     <script src="https://unpkg.com/lucide@0.363.0/dist/umd/lucide.min.js"></script>
 
@@ -103,7 +105,10 @@
                     Log In
                 </button>
             </div>
-            <!-- Removed the 'Register here' link -->
+            <p class="text-center mt-4 text-lime-600">
+                <span id="auth-prompt">Need an account?</span>
+                <a href="#" id="auth-toggle-link" class="auth-toggle">Register here</a>
+            </p>
         </div>
 
         <!-- 
@@ -137,22 +142,19 @@
                 <div id="text-history-container" class="space-y-3">
                     <!-- Text history items will be dynamically inserted here -->
                 </div>
-                <button id="load-more-texts" class="w-full mt-4 bg-gray-800 border border-gray-600 hover:bg-gray-600 text-lime-300 hover:text-black font-semibold py-2 px-4 transition duration-200 hidden">
-                    Load More
-                </button>
             </div>
 
 
             <!-- File Upload and List -->
             <div class="bg-black p-6 shadow-xl border border-lime-900">
-                <h2 class="text-lg font-semibold mb-3 text-lime-300">Encrypted Files</h2>
+                <h2 class="text-lg font-semibold mb-3 text-lime-300">Synced Files (via Gofile)</h2>
                 <!-- File Upload Input -->
                 <label for="file-upload" class="w-full bg-lime-900 border border-lime-700 hover:bg-lime-700 text-lime-300 hover:text-black font-bold py-3 px-4 transition duration-200 flex items-center justify-center space-x-2 cursor-pointer">
                     <i data-lucide="upload-cloud"></i>
                     <span>Upload New File</span>
                 </label>
                 <input type="file" id="file-upload" class="hidden">
-                <p class="text-xs text-lime-700 mt-2 text-center">Files are hosted on Gofile and expire after ~7 days. Links are encrypted.</p>
+                <p class="text-xs text-lime-700 mt-2 text-center">Files are hosted on Gofile and expire after ~7 days.</p>
                 
                 <!-- Loading Spinner (for file upload) -->
                 <div id="upload-loader" class="hidden flex items-center justify-center space-x-2 text-lime-600 mt-4">
@@ -170,128 +172,28 @@
     </div>
 
     <!-- 
-      Firebase and App Logic 
+      Supabase and App Logic 
     -->
     <script type="module">
-        // Import Firebase modules
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { 
-            getAuth, 
-            onAuthStateChanged,
-            // createUserWithEmailAndPassword, // Removed
-            signInWithEmailAndPassword,
-            signOut
-        } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { 
-            getFirestore, 
-            doc, 
-            onSnapshot, 
-            setDoc, 
-            getDoc,
-            setLogLevel
-        } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
-
-        // --- Firebase Configuration ---
-        // This is the config you provided.
-        const firebaseConfig = {
-            apiKey: "AIzaSyCeuKPj5KehbknW1QE0h_BN_4seBTZAABc",
-            authDomain: "quicksync-clip.firebaseapp.com",
-            projectId: "quicksync-clip",
-            storageBucket: "quicksync-clip.firebasestorage.app",
-            messagingSenderId: "394694314783",
-            appId: "1:394694314783:web:24120f3f959811fedf7e2a"
-        };
-        const appId = firebaseConfig.projectId; // Use projectId as the appId
-
-        let db, auth, userId;
-        let firestoreUnsubscribe = null;
+        // --- Supabase Configuration ---
+        // These are your project keys.
+        const supabaseUrl = 'https://ljesaaheerbxtkenoiug.supabase.co';
+        const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxqZXNhYWhlZXJieHRrZW5vaXVnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjIxMDgyNzIsImV4cCI6MjA3NzY4NDI3Mn0.sLMbA51U0CMqvD7Xhgaln6OatbZJdenl0CDuUWg6fTY';
         
-        // --- Encryption Key ---
-        let encryptionKey = null;
+        // Initialize Supabase client
+        const { createClient } = supabase.supabase;
+        const _supabase = createClient(supabaseUrl, supabaseAnonKey);
 
-        // --- State for Text History ---
-        let allSyncedTexts = [];
-        let displayedTextCount = 0;
-        const TEXTS_PER_PAGE = 5;
+        // --- Global State ---
+        let currentUser = null;
+        let authMode = 'login'; // 'login' or 'register'
+        let textClipsSubscription = null;
+        let fileLinksSubscription = null;
 
         // --- DOM Elements ---
         let authContainer, appContainer, authButton, logoutButton, emailInput, passwordInput,
             authSubtitle, messageBox, newTextInput, syncTextButton, textHistoryContainer,
-            loadMoreTextsButton, fileUploadInput, uploadLoader, fileListContainer;
-
-        // --- Crypto Helper Functions ---
-
-        // Convert ArrayBuffer to Base64 string
-        function abToB64(buffer) {
-            return btoa(String.fromCharCode.apply(null, new Uint8Array(buffer)));
-        }
-
-        // Convert Base64 string to ArrayBuffer
-        function b64ToAb(b64) {
-            const byteString = atob(b64);
-            const bytes = new Uint8Array(byteString.length);
-            for (let i = 0; i < byteString.length; i++) {
-                bytes[i] = byteString.charCodeAt(i);
-            }
-            return bytes.buffer;
-        }
-
-        /**
-         * Derives an AES-GCM encryption key from a password and salt.
-         */
-        async function deriveKey(password, salt) {
-            const enc = new TextEncoder();
-            const baseKey = await crypto.subtle.importKey(
-                "raw",
-                enc.encode(password),
-                "PBKDF2",
-                false,
-                ["deriveKey"]
-            );
-            return await crypto.subtle.deriveKey(
-                {
-                    name: "PBKDF2",
-                    salt: enc.encode(salt),
-                    iterations: 100000,
-                    hash: "SHA-256"
-                },
-                baseKey,
-                { name: "AES-GCM", length: 256 },
-                true,
-                ["encrypt", "decrypt"]
-            );
-        }
-
-        /**
-         * Encrypts plaintext with the derived key.
-         */
-        async function encrypt(text, key) {
-            const iv = crypto.getRandomValues(new Uint8Array(12)); // 96-bit IV
-            const ciphertext = await crypto.subtle.encrypt(
-                { name: "AES-GCM", iv: iv },
-                key,
-                new TextEncoder().encode(text)
-            );
-            return {
-                iv: abToB64(iv),
-                ciphertext: abToB64(ciphertext)
-            };
-        }
-
-        /**
-         * Decrypts ciphertext with the derived key.
-         */
-        async function decrypt(data, key) {
-            if (!data || !data.iv || !data.ciphertext) {
-                throw new Error("Invalid encrypted data structure.");
-            }
-            const decryptedBuffer = await crypto.subtle.decrypt(
-                { name: "AES-GCM", iv: b64ToAb(data.iv) },
-                key,
-                b64ToAb(data.ciphertext)
-            );
-            return new TextDecoder().decode(decryptedBuffer);
-        }
+            fileUploadInput, uploadLoader, fileListContainer, authPrompt, authToggleLink;
 
         // --- Helper Functions ---
 
@@ -307,7 +209,7 @@
          */
         function showMessage(message, type = 'info') {
             if (!messageBox) return;
-            messageBox.textContent = message.replace('Firebase: ', ''); // Make errors user-friendly
+            messageBox.textContent = message.replace('Error: ', ''); // Make errors user-friendly
             messageBox.classList.remove('hidden', 'bg-red-900', 'border-red-600', 'text-red-400', 'bg-green-900', 'border-green-600', 'text-green-400', 'bg-blue-900', 'border-blue-600', 'text-blue-400');
             
             if (type === 'error') {
@@ -344,33 +246,28 @@
         }
 
         /**
-         * Get the Firestore document reference for the current user's clipboard
+         * Toggles the auth form between Login and Register
          */
-        function getClipboardDocRef() {
-            if (!db || !userId) {
-                console.warn("getClipboardDocRef called without db or userId.");
-                return null;
-            }
-            // Data is now private, stored by user ID.
-            return doc(db, `artifacts/${appId}/private_clipboards/${userId}`);
-        }
-
-        /**
-         * A helper to check for Firestore permission errors.
-         */
-        function handleFirestoreError(error, context) {
-            console.error(`${context} Error:`, error);
-            if (error.code === 'permission-denied') {
-                showMessage(`${context} Error: Permission Denied. Please check your Firestore rules.`, 'error');
+        function toggleAuthMode() {
+            if (authMode === 'login') {
+                authMode = 'register';
+                authSubtitle.textContent = 'Create a new account.';
+                authButton.textContent = 'Register';
+                authPrompt.textContent = 'Already have an account?';
+                authToggleLink.textContent = 'Log in here';
             } else {
-                showMessage(`${context} Error: ${error.message}`, 'error');
+                authMode = 'login';
+                authSubtitle.textContent = 'Log in to access your secure clipboard.';
+                authButton.textContent = 'Log In';
+                authPrompt.textContent = 'Need an account?';
+                authToggleLink.textContent = 'Register here';
             }
         }
 
-        // --- App Logic ---
+        // --- Auth Logic ---
 
         /**
-         * Handles the Login process
+         * Handles the Login/Register process
          */
         async function handleAuth() {
             const email = emailInput.value;
@@ -389,25 +286,33 @@
             authButton.textContent = "Connecting...";
 
             try {
-                // Simplified auth logic: only login
-                const userCredential = await signInWithEmailAndPassword(auth, email, password);
+                let response;
+                if (authMode === 'login') {
+                    response = await _supabase.auth.signInWithPassword({ email, password });
+                } else {
+                    response = await _supabase.auth.signUp({ email, password });
+                    if (response.error) throw response.error;
+                    // Supabase now requires email confirmation by default.
+                    // We'll log them in, but also show the confirmation message.
+                    if (response.data.user && response.data.user.identities.length === 0) {
+                        showMessage('User already exists. Please log in.', 'error');
+                    } else {
+                        showMessage('Registration successful! Please check your email to confirm your account.', 'success');
+                    }
+                }
 
-                // SUCCESS: Derive key and proceed to app
-                // NOTE: We don't set userId here. onAuthStateChanged will handle it.
-                encryptionKey = await deriveKey(password, email);
-                
-                // Let onAuthStateChanged handle the screen change and listener setup
+                if (response.error) {
+                    throw response.error;
+                }
 
+                // onAuthStateChanged will handle switching screens
+            
             } catch (error) {
                 console.error("Auth Error:", error);
-                // Custom error for users
-                if (error.code === 'auth/invalid-credential' || error.code === 'auth/user-not-found') {
-                    showMessage('Invalid credentials. Please check your email and password.', 'error');
-                } else {
-                    showMessage(error.message, 'error');
-                }
+                showMessage(error.message, 'error');
+            } finally {
                 authButton.disabled = false;
-                authButton.textContent = "Log In"; // Simplified
+                authButton.textContent = (authMode === 'login') ? 'Log In' : 'Register';
             }
         }
 
@@ -416,8 +321,8 @@
          */
         async function handleLogout() {
             try {
-                await signOut(auth);
-                // onAuthStateChanged will handle the rest (clearing keys, screen change)
+                await _supabase.auth.signOut();
+                // onAuthStateChanged will handle cleanup
             } catch (error) {
                  console.error("Logout Error:", error);
                  showMessage(error.message, 'error');
@@ -425,123 +330,164 @@
         }
 
         /**
-         * Sets up the real-time listener on the user's private document
+         * Main auth state listener
          */
-        async function setupClipboardListener() {
-            const docRef = getClipboardDocRef();
-            if (!docRef) {
-                console.error("setupClipboardListener failed: No docRef.");
-                return; // Should not happen if userId is set
-            }
-            
-            if (firestoreUnsubscribe) {
-                firestoreUnsubscribe(); // Detach any old listener
-            }
-
-            firestoreUnsubscribe = onSnapshot(docRef, async (docSnap) => {
-                if (!encryptionKey) {
-                    console.warn("No encryption key found. Aborting snapshot update.");
-                    return;
-                }
-
-                if (docSnap.exists()) {
-                    const data = docSnap.data();
-                    try {
-                        // Decrypt Texts
-                        if (data.texts) {
-                            const decryptedTextsJson = await decrypt(data.texts, encryptionKey);
-                            allSyncedTexts = JSON.parse(decryptedTextsJson || "[]");
-                            renderTexts(true); // Reset and render
-                        } else {
-                            allSyncedTexts = [];
-                            renderTexts(true); // Reset and render
-                        }
-
-                        // Decrypt Files
-                        if (data.files) {
-                            const decryptedFilesJson = await decrypt(data.files, encryptionKey);
-                            renderFiles(JSON.parse(decryptedFilesJson || "[]"));
-                        } else {
-                            renderFiles([]);
-                        }
-                    } catch (e) {
-                        console.error("Decryption error:", e);
-                        showMessage("Error decrypting data. Wrong password? Data corrupted?", 'error');
-                        handleLogout();
-                    }
-                } else {
-                    // Document doesn't exist, it's a new clipboard
-                    allSyncedTexts = [];
-                    renderTexts(true);
+        function setupAuthListener() {
+            _supabase.auth.onAuthStateChange((event, session) => {
+                if (event === 'SIGNED_IN' && session) {
+                    currentUser = session.user;
+                    showScreen('app');
+                    // Start listening to data
+                    fetchInitialData();
+                    setupRealtimeSubscriptions();
+                } else if (event === 'SIGNED_OUT') {
+                    currentUser = null;
+                    showScreen('auth');
+                    // Stop listening to data
+                    cleanupSubscriptions();
+                    renderTexts([]);
                     renderFiles([]);
-                    showMessage('New secure clipboard ready. Start pasting!', 'info');
-                }
-            }, (error) => {
-                handleFirestoreError(error, "Clipboard Listen");
-                if (error.code === 'permission-denied') {
-                    handleLogout(); // Log out if we can't even read our data
                 }
             });
         }
 
+        // --- Realtime and Data Logic ---
+
         /**
-         * Renders the list of synced text items
-         * @param {boolean} reset - If true, clears the list and starts from page 1.
+         * Fetches all current clips and files once on load
          */
-        function renderTexts(reset = false) {
-            if (!textHistoryContainer || !loadMoreTextsButton) return;
-            if (reset) {
-                textHistoryContainer.innerHTML = '';
-                displayedTextCount = 0;
+        async function fetchInitialData() {
+            if (!currentUser) return;
+
+            // Fetch Text Clips
+            try {
+                const { data: clips, error } = await _supabase
+                    .from('clips')
+                    .select('*')
+                    .eq('user_id', currentUser.id)
+                    .order('created_at', { ascending: false });
+                
+                if (error) throw error;
+                renderTexts(clips || []);
+            } catch (error) {
+                console.error("Error fetching clips:", error);
+                showMessage("Could not load text clips.", "error");
             }
 
-            if (allSyncedTexts.length === 0) {
+            // Fetch Files
+            try {
+                const { data: files, error } = await _supabase
+                    .from('files')
+                    .select('*')
+                    .eq('user_id', currentUser.id)
+                    .order('created_at', { ascending: false });
+
+                if (error) throw error;
+                renderFiles(files || []);
+            } catch (error) {
+                console.error("Error fetching files:", error);
+                showMessage("Could not load file links.", "error");
+            }
+        }
+
+        /**
+         * Listens for any new/deleted clips and files in real-time
+         */
+        function setupRealtimeSubscriptions() {
+            if (!currentUser) return;
+            // Clean up old subscriptions just in case
+            cleanupSubscriptions();
+
+            // Listen for text clips
+            textClipsSubscription = _supabase
+                .channel('public:clips')
+                .on('postgres_changes', 
+                    { event: '*', schema: 'public', table: 'clips', filter: `user_id=eq.${currentUser.id}` },
+                    (payload) => {
+                        console.log('Realtime clip change:', payload);
+                        fetchInitialData(); // Just re-fetch all data on any change
+                    }
+                )
+                .subscribe();
+            
+            // Listen for file links
+            fileLinksSubscription = _supabase
+                .channel('public:files')
+                .on('postgres_changes', 
+                    { event: '*', schema: 'public', table: 'files', filter: `user_id=eq.${currentUser.id}` },
+                    (payload) => {
+                        console.log('Realtime file change:', payload);
+                        fetchInitialData(); // Just re-fetch all data on any change
+                    }
+                )
+                .subscribe();
+        }
+
+        /**
+         * Removes all realtime listeners
+         */
+        function cleanupSubscriptions() {
+            if (textClipsSubscription) {
+                _supabase.removeChannel(textClipsSubscription);
+                textClipsSubscription = null;
+            }
+            if (fileLinksSubscription) {
+                _supabase.removeChannel(fileLinksSubscription);
+                fileLinksSubscription = null;
+            }
+        }
+
+        // --- Text Clip Functions ---
+
+        /**
+         * Renders the list of text clips
+         */
+        function renderTexts(clips) {
+            if (!textHistoryContainer) return;
+            textHistoryContainer.innerHTML = '';
+            
+            if (!clips || clips.length === 0) {
                 textHistoryContainer.innerHTML = '<p class="text-sm text-lime-700 text-center">No text synced yet.</p>';
-                loadMoreTextsButton.classList.add('hidden');
                 return;
             }
 
-            const startIndex = displayedTextCount;
-            const endIndex = Math.min(startIndex + TEXTS_PER_PAGE, allSyncedTexts.length);
-            
-            for (let i = startIndex; i < endIndex; i++) {
-                const text = allSyncedTexts[i];
+            clips.forEach(clip => {
                 const item = document.createElement('div');
                 item.className = 'bg-gray-900 p-3 border-b border-lime-900 flex justify-between items-start space-x-3';
                 
                 const textContent = document.createElement('pre');
                 textContent.className = 'text-lime-400 text-sm whitespace-pre-wrap history-item';
-                textContent.textContent = text;
+                textContent.textContent = clip.content;
                 
+                const buttons = document.createElement('div');
+                buttons.className = 'flex-shrink-0 flex space-x-2';
+
                 const copyBtn = document.createElement('button');
-                copyBtn.className = 'text-lime-600 hover:text-lime-300 flex-shrink-0';
+                copyBtn.className = 'text-lime-600 hover:text-lime-300';
                 copyBtn.innerHTML = '<i data-lucide="clipboard" class="w-4 h-4"></i>';
                 copyBtn.onclick = () => {
                     try {
-                        navigator.clipboard.writeText(text).then(() => {
+                        navigator.clipboard.writeText(clip.content).then(() => {
                             showMessage('Copied to clipboard!', 'success');
-                        }, (err) => {
-                            // Fallback for http or other issues
-                            fallbackCopyTextToClipboard(text);
+                        }, () => {
+                            fallbackCopyTextToClipboard(clip.content); // Fallback
                         });
                     } catch (e) {
-                         fallbackCopyTextToClipboard(text);
+                         fallbackCopyTextToClipboard(clip.content);
                     }
                 };
+                
+                const deleteBtn = document.createElement('button');
+                deleteBtn.className = 'text-red-600 hover:text-red-400';
+                deleteBtn.innerHTML = '<i data-lucide="trash-2" class="w-4 h-4"></i>';
+                deleteBtn.onclick = () => handleDeleteClip(clip.id);
 
+                buttons.appendChild(copyBtn);
+                buttons.appendChild(deleteBtn);
                 item.appendChild(textContent);
-                item.appendChild(copyBtn);
+                item.appendChild(buttons);
                 textHistoryContainer.appendChild(item);
-            }
-
-            displayedTextCount = endIndex;
-
-            // Show/Hide "Load More" button
-            if (displayedTextCount < allSyncedTexts.length) {
-                loadMoreTextsButton.classList.remove('hidden');
-            } else {
-                loadMoreTextsButton.classList.add('hidden');
-            }
+            });
 
             initIcons(); // Re-initialize icons
         }
@@ -550,16 +496,12 @@
              try {
                 const textArea = document.createElement("textarea");
                 textArea.value = text;
-                
-                // Avoid scrolling to bottom
                 textArea.style.top = "0";
                 textArea.style.left = "0";
                 textArea.style.position = "fixed";
-
                 document.body.appendChild(textArea);
                 textArea.focus();
                 textArea.select();
-
                 document.execCommand('copy');
                 showMessage('Copied to clipboard!', 'success');
                 document.body.removeChild(textArea);
@@ -569,14 +511,76 @@
             }
         }
 
+        /**
+         * Saves a new text clip to Supabase
+         */
+        async function handleSyncNewText() {
+            const newText = newTextInput.value;
+            if (newText.trim().length === 0) {
+                showMessage("Cannot sync empty text.", "error");
+                return;
+            }
+            if (!currentUser) return;
+
+            syncTextButton.disabled = true;
+            syncTextButton.innerHTML = '<div class="spinner"></div>';
+
+            try {
+                const { error } = await _supabase
+                    .from('clips')
+                    .insert({ content: newText, user_id: currentUser.id });
+                
+                if (error) throw error;
+                
+                newTextInput.value = ''; // Clear input
+                showMessage("Text synced!", "success");
+                // Realtime listener will handle rendering
+
+            } catch (error) {
+                console.error("Error syncing text:", error);
+                showMessage(`Sync Error: ${error.message}`, "error");
+            } finally {
+                syncTextButton.disabled = false;
+                syncTextButton.innerHTML = '<i data-lucide="send"></i><span>Sync to All Devices</span>';
+                initIcons();
+            }
+        }
 
         /**
-         * Renders the list of files
+         * Deletes a text clip from Supabase
+         */
+        async function handleDeleteClip(clipId) {
+            // Use a simple confirm dialog for this UI
+            if (!confirm("Are you sure you want to delete this text clip?")) {
+                return;
+            }
+
+            try {
+                const { error } = await _supabase
+                    .from('clips')
+                    .delete()
+                    .eq('id', clipId);
+                
+                if (error) throw error;
+                showMessage("Text clip deleted.", "success");
+                // Realtime listener will handle rendering
+
+            } catch (error) {
+                console.error("Error deleting clip:", error);
+                showMessage(`Delete Error: ${error.message}`, "error");
+            }
+        }
+
+        // --- File Link Functions ---
+
+        /**
+         * Renders the list of file links
          */
         function renderFiles(files) {
             if (!fileListContainer) return;
             fileListContainer.innerHTML = ''; // Clear existing list
-            if (files.length === 0) {
+            
+            if (!files || files.length === 0) {
                 fileListContainer.innerHTML = '<p class="text-sm text-lime-700 text-center">No files synced yet.</p>';
                 return;
             }
@@ -586,211 +590,70 @@
                 fileElement.className = 'bg-gray-900 p-3 border-b border-lime-900 flex justify-between items-center';
                 
                 const link = document.createElement('a');
-                link.href = file.url;
+                link.href = file.file_url;
                 link.target = '_blank';
                 link.className = 'text-lime-400 hover:underline truncate mr-4';
-                link.textContent = file.name;
+                link.textContent = file.file_name;
 
                 const deleteButton = document.createElement('button');
-                deleteButton.className = 'text-red-500 hover:text-red-400 flex-shrink-0';
+                deleteButton.className = 'text-red-600 hover:text-red-400 flex-shrink-0';
                 deleteButton.innerHTML = '<i data-lucide="trash-2" class="w-4 h-4"></i>';
-                deleteButton.onclick = () => handleDeleteFile(file.url);
+                deleteButton.onclick = () => handleDeleteFile(file.id);
                 
                 fileElement.appendChild(link);
                 fileElement.appendChild(deleteButton);
                 fileListContainer.appendChild(fileElement);
             });
-            initIcons(); // Re-initialize icons for new elements
+            initIcons(); // Re-initialize icons
         }
 
         /**
-         * Gets the current decrypted text list from Firestore
-         */
-        async function getCurrentTexts() {
-            const docRef = getClipboardDocRef();
-            if (!docRef || !encryptionKey) return [];
-            
-            try {
-                const docSnap = await getDoc(docRef);
-                if (docSnap.exists() && docSnap.data().texts) {
-                    try {
-                        const decryptedTextsJson = await decrypt(docSnap.data().texts, encryptionKey);
-                        return JSON.parse(decryptedTextsJson || "[]");
-                    } catch (e) {
-                        console.error("Text list decryption failed:", e);
-                        showMessage("Could not read text history.", 'error');
-                        return [];
-                    }
-                }
-                return [];
-            } catch (error) {
-                handleFirestoreError(error, "Read Texts");
-                return [];
-            }
-        }
-
-        /**
-         * Encrypts and saves the entire text list
-         */
-        async function saveTexts(texts) {
-            const docRef = getClipboardDocRef();
-            if (!docRef || !encryptionKey) return;
-            
-            try {
-                const textsJson = JSON.stringify(texts);
-                const encryptedTexts = await encrypt(textsJson, encryptionKey);
-                await setDoc(docRef, { texts: encryptedTexts }, { merge: true });
-            } catch (error) {
-                handleFirestoreError(error, "Save Texts");
-            }
-        }
-
-        /**
-         * Handles syncing new text
-         */
-        async function handleSyncNewText() {
-            const newText = newTextInput.value;
-            if (newText.trim().length === 0) {
-                showMessage("Cannot sync empty text.", "error");
-                return;
-            }
-
-            syncTextButton.disabled = true;
-            syncTextButton.innerHTML = '<div class="spinner"></div>';
-
-            try {
-                const currentTexts = await getCurrentTexts();
-                currentTexts.unshift(newText); // Prepend new text
-                const updatedTexts = currentTexts.slice(0, 50); // Keep only 50 most recent
-                
-                await saveTexts(updatedTexts);
-                
-                newTextInput.value = ''; // Clear input
-                showMessage("Text synced!", "success");
-
-            } catch (error) {
-                // Error is already handled by saveTexts
-            } finally {
-                syncTextButton.disabled = false;
-                syncTextButton.innerHTML = '<i data-lucide="send"></i><span>Sync to All Devices</span>';
-                initIcons();
-            }
-        }
-
-        /**
-         * Gets the current decrypted file list from Firestore
-         */
-        async function getCurrentFiles() {
-            const docRef = getClipboardDocRef();
-            if (!docRef || !encryptionKey) return [];
-            
-            try {
-                const docSnap = await getDoc(docRef);
-                if (docSnap.exists() && docSnap.data().files) {
-                    try {
-                        const decryptedFilesJson = await decrypt(docSnap.data().files, encryptionKey);
-                        return JSON.parse(decryptedFilesJson || "[]");
-                    } catch (e) {
-                        console.error("File list decryption failed:", e);
-                        showMessage("Could not read file list.", 'error');
-                        return [];
-                    }
-                }
-                return [];
-            } catch (error) {
-                handleFirestoreError(error, "Read Files");
-                return [];
-            }
-        }
-
-        /**
-         * Encrypts and saves the entire file list
-         */
-        async function saveFiles(files) {
-            const docRef = getClipboardDocRef();
-            if (!docRef || !encryptionKey) return;
-            
-            try {
-                const filesJson = JSON.stringify(files);
-                const encryptedFiles = await encrypt(filesJson, encryptionKey);
-                await setDoc(docRef, { files: encryptedFiles }, { merge: true });
-            } catch (error) {
-                handleFirestoreError(error, "Save Files");
-            }
-        }
-
-        /**
-         * Handles the file upload process
+         * Handles uploading a file to Gofile and saving the link to Supabase
          */
         async function handleFileUpload(e) {
             const file = e.target.files[0];
-            if (!file) return;
+            if (!file || !currentUser) return;
 
             uploadLoader.classList.remove('hidden');
-            showMessage('Uploading file...', 'info');
+            showMessage('Uploading file to Gofile...', 'info');
 
             try {
-                // 1. Get Gofile server
-                // ** FIX: Changed endpoint to /v2/getServer **
-                const serverResponse = await fetch('https://api.gofile.io/v2/getServer');
-                if (!serverResponse.ok) {
-                    throw new Error(`Gofile server lookup failed: ${serverResponse.status}`);
-                }
-                let serverData;
-                try {
-                    serverData = await serverResponse.json();
-                } catch (jsonError) {
-                    throw new Error('Gofile server returned invalid response. API may be down.');
-                }
+                // Gofile API v2 requires no server lookup, just a POST
+                // to a regional or the main upload endpoint.
                 
-                if (serverData.status !== 'ok') {
-                    throw new Error('Could not find Gofile server.');
-                }
-                const server = serverData.data.server;
-
-                // 2. Upload file
                 const formData = new FormData();
                 formData.append('file', file);
-
-                const uploadResponse = await fetch(`https://${server}.gofile.io/v2/uploadFile`, {
+                
+                // We use the main upload endpoint which auto-selects region
+                const uploadResponse = await fetch(`https://upload.gofile.io/uploadfile`, {
                     method: 'POST',
                     body: formData,
                 });
 
                 if (!uploadResponse.ok) {
-                    throw new Error(`Gofile upload failed: ${uploadResponse.status}`);
-                }
-                let uploadData;
-                try {
-                    uploadData = await uploadResponse.json();
-                } catch (jsonError) {
-                    const textResponse = await uploadResponse.text();
-                    console.error("Gofile invalid JSON response:", textResponse);
-                    if (textResponse.includes("error-notFound")) {
-                        throw new Error('Gofile upload failed: Server error (notFound). Please try again.');
-                    }
-                    throw new Error('Gofile upload returned invalid response. API may be down.');
+                    throw new Error(`Gofile upload failed: ${uploadResponse.status} ${uploadResponse.statusText}`);
                 }
 
+                const uploadData = await uploadResponse.json();
+                
                 if (uploadData.status !== 'ok') {
                     throw new Error(`File upload failed: ${uploadData.data.error || 'Unknown error'}`);
                 }
 
-                // 3. Add encrypted file link to Firestore
+                // 3. Save link to Supabase
                 const newFile = {
-                    name: uploadData.data.fileName,
-                    url: uploadData.data.downloadPage,
-                    uploadedAt: new Date().toISOString()
+                    file_name: uploadData.data.fileName,
+                    file_url: uploadData.data.downloadPage,
+                    user_id: currentUser.id
                 };
 
-                const currentFiles = await getCurrentFiles();
-                const updatedFiles = [newFile, ...currentFiles];
-                await saveFiles(updatedFiles);
+                const { error } = await _supabase.from('files').insert(newFile);
+                if (error) throw error;
                 
-                showMessage('File uploaded and link encrypted!', 'success');
+                showMessage('File uploaded and link synced!', 'success');
+                // Realtime will handle rendering
 
-            } catch (error)
-            {
+            } catch (error) {
                 console.error('File upload error:', error);
                 showMessage(`${error.message}`, 'error');
             } finally {
@@ -800,35 +663,26 @@
         }
 
         /**
-         * Deletes a file from the encrypted list
+         * Deletes a file link from Supabase
          */
-        async function handleDeleteFile(fileUrl) {
-            showMessage('Click again to confirm deletion.', 'error');
-            
-            const deleteButton = event.target.closest('button');
-            if (!deleteButton || deleteButton.dataset.confirmed === "true") return; // Prevent double-clicks
+        async function handleDeleteFile(fileId) {
+            if (!confirm("Are you sure you want to delete this file link?")) {
+                return;
+            }
 
-            deleteButton.dataset.confirmed = "true";
-            deleteButton.onclick = () => {
-                performDelete(fileUrl);
-            };
+            try {
+                const { error } = await _supabase
+                    .from('files')
+                    .delete()
+                    .eq('id', fileId);
+                
+                if (error) throw error;
+                showMessage("File link deleted.", "success");
+                // Realtime listener will handle rendering
 
-            setTimeout(() => {
-                if(deleteButton) { // Check if element still exists
-                    deleteButton.dataset.confirmed = "false";
-                    deleteButton.onclick = () => handleDeleteFile(fileUrl);
-                }
-            }, 3000);
-        }
-        
-        async function performDelete(fileUrl) {
-             try {
-                const currentFiles = await getCurrentFiles();
-                const updatedFiles = currentFiles.filter(file => file.url !== fileUrl);
-                await saveFiles(updatedFiles);
-                showMessage('File link removed.', 'success');
             } catch (error) {
-                // Error is handled by saveFiles
+                console.error("Error deleting file link:", error);
+                showMessage(`Delete Error: ${error.message}`, "error");
             }
         }
 
@@ -849,10 +703,11 @@
             newTextInput = document.getElementById('new-text-input');
             syncTextButton = document.getElementById('sync-text-button');
             textHistoryContainer = document.getElementById('text-history-container');
-            loadMoreTextsButton = document.getElementById('load-more-texts');
             fileUploadInput = document.getElementById('file-upload');
             uploadLoader = document.getElementById('upload-loader');
             fileListContainer = document.getElementById('file-list');
+            authPrompt = document.getElementById('auth-prompt');
+            authToggleLink = document.getElementById('auth-toggle-link');
         }
 
         /**
@@ -863,67 +718,41 @@
                 // First, assign DOM elements
                 assignDOMElements();
 
-                // Then, initialize Firebase
-                const app = initializeApp(firebaseConfig);
-                db = getFirestore(app);
-                auth = getAuth(app);
-                setLogLevel('Debug');
-
-                // Main auth state listener
-                onAuthStateChanged(auth, async (user) => {
-                    // This is the updated logic
-                    if (user && encryptionKey) {
-                        // User is signed in AND we have the in-memory key. Good to go.
-                        userId = user.uid; // Set userId *first*
-                        
-                        if (!firestoreUnsubscribe) {
-                            // Only setup listener *after* userId is set
-                            await setupClipboardListener();
-                        }
-                        showScreen('app');
-                        // Reset login button in case it was stuck on "Connecting..."
-                        if(authButton) {
-                            authButton.disabled = false;
-                            authButton.textContent = "Log In";
-                        }
-                    } else if (user && !encryptionKey) {
-                        // User is signed in (e.g., page reload) but we don't have the key.
-                        // This forces them to log in again to derive the key.
-                        await signOut(auth);
-                        showMessage('Please log in again to securely access your clipboard.', 'info');
-                    } else {
-                        // No user is signed in.
-                        userId = null;
-                        encryptionKey = null;
-                        if (firestoreUnsubscribe) {
-                            firestoreUnsubscribe();
-                            firestoreUnsubscribe = null;
-                        }
-                        showScreen('auth');
-                        // Clear all state
-                        allSyncedTexts = [];
-                        renderTexts(true);
-                        renderFiles([]);
-                        if(newTextInput) newTextInput.value = '';
-                    }
-                });
+                // Check if all elements were found
+                if (!authContainer || !appContainer || !authButton || !logoutButton) {
+                    throw new Error("Core DOM elements not found. Check your HTML IDs.");
+                }
 
                 // Attach event listeners
                 authButton.addEventListener('click', handleAuth);
                 logoutButton.addEventListener('click', handleLogout);
+                authToggleLink.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    toggleAuthMode();
+                });
                 syncTextButton.addEventListener('click', handleSyncNewText);
-                loadMoreTextsButton.addEventListener('click', () => renderTexts(false)); // false = don't reset
                 fileUploadInput.addEventListener('change', handleFileUpload);
                 
-                // Make delete function global for inline onclick
-                window.handleDeleteFile = handleDeleteFile;
-                window.performDelete = performDelete;
+                // Set up the main auth listener
+                setupAuthListener();
 
+                // Initialize icons
                 initIcons();
+
+                // Check initial auth state (in case user is already logged in)
+                const { data: { session } } = await _supabase.auth.getSession();
+                if (session) {
+                    currentUser = session.user;
+                    showScreen('app');
+                    fetchInitialData();
+                    setupRealtimeSubscriptions();
+                } else {
+                    showScreen('auth');
+                }
 
             } catch (error) {
                 console.error("Initialization Error:", error);
-                document.body.innerHTML = `<h1 class="text-red-500 text-center p-8">Error initializing app: ${error.message}. Make sure all HTML IDs are correct.</h1>`;
+                document.body.innerHTML = `<h1 class="text-red-500 text-center p-8">Error initializing app: ${error.message}.</h1>`;
             }
         }
 
