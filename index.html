@@ -9,7 +9,7 @@
     <!-- Load Inconsolata font (monospaced) -->
     <link href="https://fonts.googleapis.com/css2?family=Inconsolata:wght@400;700&display=swap" rel="stylesheet">
     <!-- Load an icon library (for copy, delete, upload icons) -->
-    <script src="https://unpkg.com/lucide-react@0.363.0/dist/umd/lucide.min.js"></script>
+    <script src="https://unpkg.com/lucide-react@0.363.0/dist/umd/luci.min.js"></script>
 
     <style>
         /* Use Inconsolata font */
@@ -68,6 +68,13 @@
         h1, h2 {
             text-shadow: 0 0 5px #00ff00;
         }
+
+        /* Style for the auth toggle link */
+        .auth-toggle {
+            color: #00ff00;
+            text-decoration: underline;
+            cursor: pointer;
+        }
     </style>
 </head>
 <body class="min-h-screen flex items-center justify-center p-4">
@@ -78,19 +85,22 @@
     <div class="w-full max-w-2xl">
 
         <!-- 
-          Login Screen 
+          Login/Register Screen 
         -->
         <div id="auth-container" class="bg-black p-8 shadow-xl border border-lime-900">
             <h1 class="text-3xl font-bold text-center mb-2 text-lime-300">QuickSync Clip</h1>
-            <p class="text-center text-lime-600 mb-6">Enter credentials to access your clipboard.</p>
+            <p id="auth-subtitle" class="text-center text-lime-600 mb-6">Log in to access your secure clipboard.</p>
             <div class="space-y-4">
-                <input type="text" id="clipboard-username-input" class="w-full p-3 bg-gray-900 border border-lime-800 text-lime-300 placeholder-lime-700 focus:outline-none focus:ring-2 focus:ring-lime-500 focus:border-lime-500" placeholder="Clipboard Username">
-                <input type="password" id="clipboard-password-input" class="w-full p-3 bg-gray-900 border border-lime-800 text-lime-300 placeholder-lime-700 focus:outline-none focus:ring-2 focus:ring-lime-500 focus:border-lime-500" placeholder="Clipboard Password">
-                <button id="login-button" class="w-full bg-lime-900 border border-lime-700 hover:bg-lime-700 text-lime-300 hover:text-black font-bold py-3 px-4 transition duration-200">
-                    Access Clipboard
+                <input type="email" id="email-input" class="w-full p-3 bg-gray-900 border border-lime-800 text-lime-300 placeholder-lime-700 focus:outline-none focus:ring-2 focus:ring-lime-500 focus:border-lime-500" placeholder="Email">
+                <input type="password" id="password-input" class="w-full p-3 bg-gray-900 border border-lime-800 text-lime-300 placeholder-lime-700 focus:outline-none focus:ring-2 focus:ring-lime-500 focus:border-lime-500" placeholder="Password">
+                <button id="auth-button" class="w-full bg-lime-900 border border-lime-700 hover:bg-lime-700 text-lime-300 hover:text-black font-bold py-3 px-4 transition duration-200">
+                    Log In
                 </button>
             </div>
-            <p class="text-xs text-lime-700 mt-4 text-center">This combination is your password. Choose a strong, unique password.</p>
+            <p class="text-xs text-lime-700 mt-4 text-center">
+                <span id="auth-toggle-text">Need an account?</span>
+                <a id="auth-toggle-link" class="auth-toggle">Register here.</a>
+            </p>
         </div>
 
         <!-- 
@@ -101,7 +111,7 @@
             <div class="flex justify-between items-center mb-4">
                 <h1 class="text-2xl font-bold text-lime-300">QuickSync Clip</h1>
                 <button id="logout-button" class="text-sm text-lime-600 hover:text-lime-300 transition">
-                    Lock (Logout)
+                    Logout
                 </button>
             </div>
 
@@ -110,8 +120,8 @@
 
             <!-- Synced Text Area -->
             <div class="bg-black p-6 shadow-xl mb-6 border border-lime-900">
-                <h2 class="text-lg font-semibold mb-3 text-lime-300">Synced Text</h2>
-                <textarea id="text-sync-area" class="w-full h-40 p-3 bg-gray-900 border border-lime-800 text-lime-300 placeholder-lime-700 resize-none focus:outline-none focus:ring-2 focus:ring-lime-500 focus:border-lime-500" placeholder="Paste text here... it will sync instantly."></textarea>
+                <h2 class="text-lg font-semibold mb-3 text-lime-300">Encrypted Text</h2>
+                <textarea id="text-sync-area" class="w-full h-40 p-3 bg-gray-900 border border-lime-800 text-lime-300 placeholder-lime-700 resize-none focus:outline-none focus:ring-2 focus:ring-lime-500 focus:border-lime-500" placeholder="Paste text here... it will be encrypted and synced."></textarea>
                 <div class="flex space-x-2 mt-3">
                     <button id="copy-button" class="flex-1 bg-lime-900 border border-lime-700 hover:bg-lime-700 text-lime-300 hover:text-black font-semibold py-2 px-4 transition duration-200 flex items-center justify-center space-x-2">
                         <i data-lucide="clipboard"></i>
@@ -126,14 +136,14 @@
 
             <!-- File Upload and List -->
             <div class="bg-black p-6 shadow-xl border border-lime-900">
-                <h2 class="text-lg font-semibold mb-3 text-lime-300">Synced Files</h2>
+                <h2 class="text-lg font-semibold mb-3 text-lime-300">Encrypted Files</h2>
                 <!-- File Upload Input -->
                 <label for="file-upload" class="w-full bg-lime-900 border border-lime-700 hover:bg-lime-700 text-lime-300 hover:text-black font-bold py-3 px-4 transition duration-200 flex items-center justify-center space-x-2 cursor-pointer">
                     <i data-lucide="upload-cloud"></i>
                     <span>Upload New File</span>
                 </label>
                 <input type="file" id="file-upload" class="hidden">
-                <p class="text-xs text-lime-700 mt-2 text-center">Files are hosted on Gofile and expire after ~7 days.</p>
+                <p class="text-xs text-lime-700 mt-2 text-center">Files are hosted on Gofile and expire after ~7 days. Links are encrypted.</p>
                 
                 <!-- Loading Spinner (for file upload) -->
                 <div id="upload-loader" class="hidden flex items-center justify-center space-x-2 text-lime-600 mt-4">
@@ -158,9 +168,10 @@
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { 
             getAuth, 
-            signInAnonymously, 
-            signInWithCustomToken, 
-            onAuthStateChanged 
+            onAuthStateChanged,
+            createUserWithEmailAndPassword,
+            signInWithEmailAndPassword,
+            signOut
         } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { 
             getFirestore, 
@@ -172,31 +183,36 @@
         } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
         // --- Firebase Configuration ---
-        // These global variables are provided by the environment.
-        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-quicksync-app';
         const firebaseConfig = {
-        apiKey: "AIzaSyCeuKPj5KehbknW1QE0h_BN_4seBTZAABc",
-        authDomain: "quicksync-clip.firebaseapp.com",
-        projectId: "quicksync-clip",
-        storageBucket: "quicksync-clip.firebasestorage.app",
-        messagingSenderId: "394694314783",
-        appId: "1:394694314783:web:24120f3f959811fedf7e2a"
-            };        
-        const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
+            apiKey: "AIzaSyCeuKPj5KehbknW1QE0h_BN_4seBTZAABc",
+            authDomain: "quicksync-clip.firebaseapp.com",
+            projectId: "quicksync-clip",
+            storageBucket: "quicksync-clip.firebasestorage.app",
+            messagingSenderId: "394694314783",
+            appId: "1:394694314783:web:24120f3f959811fedf7e2a"
+        };
+        const appId = firebaseConfig.projectId; // Use projectId as the appId
 
         let db, auth, userId;
-        let currentClipboardId = null;
         let firestoreUnsubscribe = null;
         let textUpdateTimeout = null;
         let isUpdatingText = false; // Flag to prevent onSnapshot from overwriting user typing
 
+        // --- Encryption Key ---
+        // This key is derived from the user's password on login and is ONLY stored in memory.
+        let encryptionKey = null;
+
         // --- DOM Elements ---
         const authContainer = document.getElementById('auth-container');
         const appContainer = document.getElementById('app-container');
-        const loginButton = document.getElementById('login-button');
+        const authButton = document.getElementById('auth-button');
         const logoutButton = document.getElementById('logout-button');
-        const clipboardUsernameInput = document.getElementById('clipboard-username-input');
-        const clipboardPasswordInput = document.getElementById('clipboard-password-input');
+        const emailInput = document.getElementById('email-input');
+        const passwordInput = document.getElementById('password-input');
+        
+        const authSubtitle = document.getElementById('auth-subtitle');
+        const authToggleText = document.getElementById('auth-toggle-text');
+        const authToggleLink = document.getElementById('auth-toggle-link');
         
         const messageBox = document.getElementById('message-box');
         
@@ -207,6 +223,91 @@
         const fileUploadInput = document.getElementById('file-upload');
         const uploadLoader = document.getElementById('upload-loader');
         const fileListContainer = document.getElementById('file-list');
+
+        let isRegisterMode = false;
+
+        // --- Crypto Helper Functions ---
+
+        // Convert ArrayBuffer to Base64 string
+        function abToB64(buffer) {
+            return btoa(String.fromCharCode.apply(null, new Uint8Array(buffer)));
+        }
+
+        // Convert Base64 string to ArrayBuffer
+        function b64ToAb(b64) {
+            const byteString = atob(b64);
+            const bytes = new Uint8Array(byteString.length);
+            for (let i = 0; i < byteString.length; i++) {
+                bytes[i] = byteString.charCodeAt(i);
+            }
+            return bytes.buffer;
+        }
+
+        /**
+         * Derives an AES-GCM encryption key from a password and salt.
+         * @param {string} password - The user's password.
+         * @param {string} salt - A unique salt (we'll use the user's email).
+         * @returns {Promise<CryptoKey>} The derived CryptoKey.
+         */
+        async function deriveKey(password, salt) {
+            const enc = new TextEncoder();
+            const baseKey = await crypto.subtle.importKey(
+                "raw",
+                enc.encode(password),
+                "PBKDF2",
+                false,
+                ["deriveKey"]
+            );
+            return await crypto.subtle.deriveKey(
+                {
+                    name: "PBKDF2",
+                    salt: enc.encode(salt),
+                    iterations: 100000,
+                    hash: "SHA-256"
+                },
+                baseKey,
+                { name: "AES-GCM", length: 256 },
+                true,
+                ["encrypt", "decrypt"]
+            );
+        }
+
+        /**
+         * Encrypts plaintext with the derived key.
+         * @param {string} text - The plaintext to encrypt.
+         * @param {CryptoKey} key - The AES-GCM key.
+         * @returns {Promise<Object>} An object with base64-encoded iv and ciphertext.
+         */
+        async function encrypt(text, key) {
+            const iv = crypto.getRandomValues(new Uint8Array(12)); // 96-bit IV
+            const ciphertext = await crypto.subtle.encrypt(
+                { name: "AES-GCM", iv: iv },
+                key,
+                new TextEncoder().encode(text)
+            );
+            return {
+                iv: abToB64(iv),
+                ciphertext: abToB64(ciphertext)
+            };
+        }
+
+        /**
+         * Decrypts ciphertext with the derived key.
+         * @param {Object} data - An object with base64-encoded iv and ciphertext.
+         * @param {CryptoKey} key - The AES-GCM key.
+         * @returns {Promise<string>} The decrypted plaintext.
+         */
+        async function decrypt(data, key) {
+            if (!data || !data.iv || !data.ciphertext) {
+                throw new Error("Invalid encrypted data structure.");
+            }
+            const decryptedBuffer = await crypto.subtle.decrypt(
+                { name: "AES-GCM", iv: b64ToAb(data.iv) },
+                key,
+                b64ToAb(data.ciphertext)
+            );
+            return new TextDecoder().decode(decryptedBuffer);
+        }
 
         // --- Helper Functions ---
 
@@ -223,8 +324,7 @@
          * @param {'info' | 'error' | 'success'} type - The message type
          */
         function showMessage(message, type = 'info') {
-            messageBox.textContent = message;
-            // Clear all previous color classes
+            messageBox.textContent = message.replace('Firebase: ', ''); // Make errors user-friendly
             messageBox.classList.remove('hidden', 'bg-red-900', 'border-red-600', 'text-red-400', 'bg-green-900', 'border-green-600', 'text-green-400', 'bg-blue-900', 'border-blue-600', 'text-blue-400');
             
             if (type === 'error') {
@@ -234,9 +334,13 @@
             } else {
                 messageBox.classList.add('bg-blue-900', 'border-blue-600', 'text-blue-400');
             }
-            // Auto-hide after 5 seconds
+            
+            messageBox.classList.remove('hidden');
+            
             setTimeout(() => {
-                messageBox.classList.add('hidden');
+                if (!messageBox.classList.contains('hidden')) {
+                     messageBox.classList.add('hidden');
+                }
             }, 5000);
         }
 
@@ -248,44 +352,52 @@
             if (screenName === 'app') {
                 authContainer.classList.add('hidden');
                 appContainer.classList.remove('hidden');
+                messageBox.classList.add('hidden'); // Hide any auth messages
             } else {
                 appContainer.classList.add('hidden');
                 authContainer.classList.remove('hidden');
+                passwordInput.value = ''; // Clear password on logout/show
             }
         }
 
         /**
-         * Get the Firestore document reference for the current clipboard
+         * Toggles between Login and Register modes
+         */
+        function toggleAuthMode() {
+            isRegisterMode = !isRegisterMode;
+            if (isRegisterMode) {
+                authSubtitle.textContent = "Create an account to use your secure clipboard.";
+                authButton.textContent = "Register";
+                authToggleText.textContent = "Already have an account?";
+                authToggleLink.textContent = "Log in here.";
+            } else {
+                authSubtitle.textContent = "Log in to access your secure clipboard.";
+                authButton.textContent = "Log In";
+                authToggleText.textContent = "Need an account?";
+                authToggleLink.textContent = "Register here.";
+            }
+        }
+
+        /**
+         * Get the Firestore document reference for the current user's clipboard
          */
         function getClipboardDocRef() {
-            if (!db || !currentClipboardId) return null;
-            return doc(db, `artifacts/${appId}/public/data/clipboards/${currentClipboardId}`);
+            if (!db || !userId) return null;
+            // Data is now private, stored by user ID.
+            return doc(db, `artifacts/${appId}/private_clipboards/${userId}`);
         }
 
         // --- App Logic ---
 
         /**
-         * Hashes a string using SHA-256
-         * @param {string} message - The string to hash
-         * @returns {Promise<string>} The hex-encoded hash
+         * Handles the Login/Register process
          */
-        async function sha256(message) {
-            const msgBuffer = new TextEncoder().encode(message);                    
-            const hashBuffer = await crypto.subtle.digest('SHA-256', msgBuffer);
-            const hashArray = Array.from(new Uint8Array(hashBuffer));
-            const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
-            return hashHex;
-        }
-
-        /**
-         * Handles the login process
-         */
-        async function handleLogin() {
-            const username = clipboardUsernameInput.value;
-            const password = clipboardPasswordInput.value;
+        async function handleAuth() {
+            const email = emailInput.value;
+            const password = passwordInput.value;
             
-            if (username.length < 4) {
-                showMessage('Username must be at least 4 characters long.', 'error');
+            if (email.length < 4 || !email.includes('@')) {
+                showMessage('Please enter a valid email.', 'error');
                 return;
             }
             if (password.length < 6) {
@@ -293,65 +405,105 @@
                 return;
             }
 
-            // Create a unique, consistent hash from the credentials
-            const combinedId = `${username.toLowerCase().trim()}::${password}`;
-            currentClipboardId = await sha256(combinedId);
-            
-            clipboardUsernameInput.value = ''; // Clear fields
-            clipboardPasswordInput.value = '';
-            
-            sessionStorage.setItem('quicksync_clipboard_hash', currentClipboardId); // Remember hash for session
-            
-            await setupClipboardListener();
-            showScreen('app');
+            authButton.disabled = true;
+            authButton.textContent = "Connecting...";
+
+            try {
+                let userCredential;
+                if (isRegisterMode) {
+                    userCredential = await createUserWithEmailAndPassword(auth, email, password);
+                    showMessage('Account created successfully! Logging in...', 'success');
+                } else {
+                    userCredential = await signInWithEmailAndPassword(auth, email, password);
+                }
+
+                // SUCCESS: Derive key and proceed to app
+                encryptionKey = await deriveKey(password, email);
+                userId = userCredential.user.uid; // Set userId from successful auth
+                
+                await setupClipboardListener();
+                showScreen('app');
+
+            } catch (error) {
+                console.error("Auth Error:", error);
+                showMessage(error.message, 'error');
+            } finally {
+                authButton.disabled = false;
+                authButton.textContent = isRegisterMode ? "Register" : "Log In";
+            }
         }
 
         /**
          * Handles the logout process
          */
-        function handleLogout() {
-            if (firestoreUnsubscribe) {
-                firestoreUnsubscribe();
-                firestoreUnsubscribe = null;
+        async function handleLogout() {
+            try {
+                await signOut(auth);
+                // onAuthStateChanged will handle the rest
+                // (clearing state, showing auth screen)
+            } catch (error) {
+                 console.error("Logout Error:", error);
+                 showMessage(error.message, 'error');
             }
-            currentClipboardId = null;
-            sessionStorage.removeItem('quicksync_clipboard_hash');
-            textArea.value = '';
-            fileListContainer.innerHTML = '';
-            showScreen('auth');
         }
 
         /**
-         * Sets up the real-time listener on the Firestore document
+         * Sets up the real-time listener on the user's private document
          */
         async function setupClipboardListener() {
             const docRef = getClipboardDocRef();
             if (!docRef) return;
+            
+            if (firestoreUnsubscribe) {
+                firestoreUnsubscribe(); // Detach any old listener
+            }
 
-            firestoreUnsubscribe = onSnapshot(docRef, (docSnap) => {
+            firestoreUnsubscribe = onSnapshot(docRef, async (docSnap) => {
+                if (!encryptionKey) {
+                    console.warn("No encryption key found. Aborting snapshot update.");
+                    return;
+                }
+
                 if (docSnap.exists()) {
                     const data = docSnap.data();
-                    // Update text area, only if not currently being typed in
-                    if (!isUpdatingText && document.activeElement !== textArea) {
-                        textArea.value = data.text || '';
+                    try {
+                        // Decrypt Text
+                        if (data.text && !isUpdatingText && document.activeElement !== textArea) {
+                            const decryptedText = await decrypt(data.text, encryptionKey);
+                            textArea.value = decryptedText;
+                        } else if (!data.text) {
+                            textArea.value = '';
+                        }
+
+                        // Decrypt Files
+                        if (data.files) {
+                            const decryptedFilesJson = await decrypt(data.files, encryptionKey);
+                            renderFiles(JSON.parse(decryptedFilesJson || "[]"));
+                        } else {
+                            renderFiles([]);
+                        }
+                    } catch (e) {
+                        console.error("Decryption error:", e);
+                        showMessage("Error decrypting data. Wrong password? Data corrupted?", 'error');
+                        // Corrupt data or wrong key. Logout to force re-key.
+                        handleLogout();
                     }
-                    renderFiles(data.files || []);
                 } else {
                     // Document doesn't exist, it's a new clipboard
                     textArea.value = '';
                     renderFiles([]);
-                    showMessage('New clipboard created. Start pasting!', 'info');
+                    showMessage('New secure clipboard ready. Start pasting!', 'info');
                 }
             }, (error) => {
                 console.error("Error listening to clipboard:", error);
-                showMessage('Error connecting to clipboard. Check ID or connection.', 'error');
+                showMessage('Error connecting to clipboard.', 'error');
                 handleLogout();
             });
         }
 
         /**
          * Renders the list of files
-         * @param {Array} files - Array of file objects from Firestore
+         * @param {Array} files - Array of file objects
          */
         function renderFiles(files) {
             fileListContainer.innerHTML = ''; // Clear existing list
@@ -383,7 +535,7 @@
         }
 
         /**
-         * Handles changes to the text area (debounced)
+         * Encrypts and saves the text area content (debounced)
          */
         function handleTextChange() {
             isUpdatingText = true;
@@ -394,10 +546,11 @@
             textUpdateTimeout = setTimeout(async () => {
                 const newText = textArea.value;
                 const docRef = getClipboardDocRef();
-                if (!docRef) return;
+                if (!docRef || !encryptionKey) return;
                 
                 try {
-                    await setDoc(docRef, { text: newText }, { merge: true });
+                    const encryptedData = await encrypt(newText, encryptionKey);
+                    await setDoc(docRef, { text: encryptedData }, { merge: true });
                 } catch (error) {
                     console.error("Error updating text:", error);
                     showMessage('Error syncing text.', 'error');
@@ -411,7 +564,6 @@
          * Copies text from the text area to the user's clipboard
          */
         function handleCopyText() {
-            // Use execCommand as a fallback for iframe environments
             try {
                 textArea.select();
                 document.execCommand('copy');
@@ -423,11 +575,50 @@
         }
 
         /**
-         * Clears the synced text
+         * Clears the synced text (and encrypts the empty string)
          */
         async function handleClearText() {
             textArea.value = '';
             handleTextChange(); // Trigger sync
+        }
+
+        /**
+         * Gets the current decrypted file list from Firestore
+         */
+        async function getCurrentFiles() {
+            const docRef = getClipboardDocRef();
+            if (!docRef || !encryptionKey) return [];
+            
+            const docSnap = await getDoc(docRef);
+            if (docSnap.exists() && docSnap.data().files) {
+                try {
+                    const decryptedFilesJson = await decrypt(docSnap.data().files, encryptionKey);
+                    return JSON.parse(decryptedFilesJson || "[]");
+                } catch (e) {
+                    console.error("File list decryption failed:", e);
+                    showMessage("Could not read file list.", 'error');
+                    return [];
+                }
+            }
+            return [];
+        }
+
+        /**
+         * Encrypts and saves the entire file list
+         * @param {Array} files - The array of file objects
+         */
+        async function saveFiles(files) {
+            const docRef = getClipboardDocRef();
+            if (!docRef || !encryptionKey) return;
+            
+            try {
+                const filesJson = JSON.stringify(files);
+                const encryptedFiles = await encrypt(filesJson, encryptionKey);
+                await setDoc(docRef, { files: encryptedFiles }, { merge: true });
+            } catch (error) {
+                console.error("Error saving file list:", error);
+                showMessage("Could not save file list.", 'error');
+            }
         }
 
         /**
@@ -465,23 +656,18 @@
                     throw new Error('File upload failed.');
                 }
 
-                // 3. Add file to Firestore
+                // 3. Add encrypted file link to Firestore
                 const newFile = {
                     name: uploadData.data.fileName,
                     url: uploadData.data.downloadPage,
                     uploadedAt: new Date().toISOString()
                 };
 
-                const docRef = getClipboardDocRef();
-                const docSnap = await getDoc(docRef);
-                const currentFiles = (docSnap.exists() && docSnap.data().files) ? docSnap.data().files : [];
-                
-                // Add new file to the top of the list
+                const currentFiles = await getCurrentFiles();
                 const updatedFiles = [newFile, ...currentFiles];
-
-                await setDoc(docRef, { files: updatedFiles }, { merge: true });
+                await saveFiles(updatedFiles);
                 
-                showMessage('File uploaded successfully!', 'success');
+                showMessage('File uploaded and link encrypted!', 'success');
 
             } catch (error) {
                 console.error('File upload error:', error);
@@ -493,24 +679,19 @@
         }
 
         /**
-         * Deletes a file from the Firestore list (not from Gofile)
+         * Deletes a file from the encrypted list
          * @param {string} fileUrl - The URL of the file to delete
          */
         async function handleDeleteFile(fileUrl) {
-            // We can't use a standard confirm() box in this environment.
-            // For simplicity, we'll just ask in the message box.
-            // A proper implementation would use a custom modal.
             showMessage('Click again to confirm deletion.', 'error');
             
-            // Re-bind the click to a new confirm function
             const deleteButton = event.target.closest('button');
             if (!deleteButton.dataset.confirmed) {
                  deleteButton.dataset.confirmed = "true";
-                 deleteButton.onclick = ()_=> {
+                 deleteButton.onclick = () => {
                     performDelete(fileUrl);
                  }
-                 // Reset after 3 seconds if not clicked
-                 setTimeout(()_=> {
+                 setTimeout(() => {
                      deleteButton.dataset.confirmed = "false";
                      deleteButton.onclick = () => handleDeleteFile(fileUrl);
                  }, 3000);
@@ -520,18 +701,11 @@
         
         async function performDelete(fileUrl) {
              try {
-                const docRef = getClipboardDocRef();
-                const docSnap = await getDoc(docRef);
-                
-                if (!docSnap.exists()) return;
-
-                const currentFiles = docSnap.data().files || [];
+                const currentFiles = await getCurrentFiles();
                 const updatedFiles = currentFiles.filter(file => file.url !== fileUrl);
-
-                await setDoc(docRef, { files: updatedFiles }, { merge: true });
+                await saveFiles(updatedFiles);
                 showMessage('File link removed.', 'success');
-            } catch (error)
-                {
+            } catch (error) {
                 console.error('Error removing file link:', error);
                 showMessage('Could not remove file link.', 'error');
             }
@@ -543,45 +717,44 @@
          * Main function to initialize the app
          */
         async function main() {
-            if (!firebaseConfig.apiKey) {
-                document.body.innerHTML = '<h1 class="text-red-500 text-center p-8">Firebase configuration is missing. This app cannot run.</h1>';
-                return;
-            }
-
             try {
                 const app = initializeApp(firebaseConfig);
                 db = getFirestore(app);
                 auth = getAuth(app);
-                setLogLevel('Debug'); // Enable Firestore logging
+                setLogLevel('Debug');
 
-                // Listen for auth state changes
+                // Main auth state listener
                 onAuthStateChanged(auth, async (user) => {
-                    if (user) {
+                    if (user && encryptionKey) {
+                        // User is signed in AND we have the in-memory key. Good to go.
                         userId = user.uid;
-                        console.log('User is authenticated:', userId);
-                        
-                        // Check if we have a clipboard ID in session storage
-                        const sessionClipboardId = sessionStorage.getItem('quicksync_clipboard_hash');
-                        if (sessionClipboardId) {
-                            currentClipboardId = sessionClipboardId;
-                            await setupClipboardListener();
-                            showScreen('app');
-                        } else {
-                            showScreen('auth');
+                        if (!firestoreUnsubscribe) {
+                           await setupClipboardListener();
                         }
-                        
+                        showScreen('app');
+                    } else if (user && !encryptionKey) {
+                        // User is signed in (e.g., page reload) but we don't have the key.
+                        // Force a logout to make them re-authenticate and derive the key.
+                        await signOut(auth);
+                        // The 'else' block will catch the new 'null' user state.
+                        showMessage('Please log in again to securely access your clipboard.', 'info');
                     } else {
-                        // No user, sign in
-                        if (initialAuthToken) {
-                            await signInWithCustomToken(auth, initialAuthToken);
-                        } else {
-                            await signInAnonymously(auth);
+                        // No user is signed in.
+                        userId = null;
+                        encryptionKey = null;
+                        if (firestoreUnsubscribe) {
+                            firestoreUnsubscribe();
+                            firestoreUnsubscribe = null;
                         }
+                        showScreen('auth');
+                        textArea.value = '';
+                        fileListContainer.innerHTML = '';
                     }
                 });
 
                 // Attach event listeners
-                loginButton.addEventListener('click', handleLogin);
+                authButton.addEventListener('click', handleAuth);
+                authToggleLink.addEventListener('click', toggleAuthMode);
                 logoutButton.addEventListener('click', handleLogout);
                 
                 textArea.addEventListener('input', handleTextChange);
@@ -592,7 +765,7 @@
                 
                 // Make delete function global for inline onclick
                 window.handleDeleteFile = handleDeleteFile;
-                window.performDelete = performDelete; // Make helper global too
+                window.performDelete = performDelete;
 
                 initIcons();
 
@@ -607,5 +780,4 @@
     </script>
 </body>
 </html>
-
 
