@@ -181,7 +181,8 @@
         const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxqZXNhYWhlZXJieHRrZW5vaXVnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjIxMDgyNzIsImV4cCI6MjA3NzY4NDI3Mn0.sLMbA51U0CMqvD7Xhgaln6OatbZJdenl0CDuUWg6fTY';
         
         // Initialize Supabase client
-        const { createClient } = supabase.supabase;
+        // ** FIX: Changed 'supabase.supabase' to just 'supabase' **
+        const { createClient } = supabase;
         const _supabase = createClient(supabaseUrl, supabaseAnonKey);
 
         // --- Global State ---
