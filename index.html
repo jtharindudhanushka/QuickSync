@@ -4,31 +4,22 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>QuickSync Clip</title>
-    <!-- Load Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Load Inconsolata font (monospaced) -->
     <link href="https://fonts.googleapis.com/css2?family=Inconsolata:wght@400;700&display=swap" rel="stylesheet">
-    <!-- Load Supabase Client -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <!-- Load an icon library (for copy, delete, upload icons) -->
     <script src="https://unpkg.com/lucide@0.363.0/dist/umd/lucide.min.js"></script>
-    <!-- Load QR Code Generator Library -->
-    <script src="https://cdn.jsdelivr.net/npm/qrcodegen@1.8.0/qrcodegen.min.js"></script>
-
+    <script src="https://cdn.jsdelivr.net/npm/qrcode@1/build/qrcode.min.js" defer></script>
 
     <style>
-        /* Use Inconsolata font */
         body {
             font-family: 'Inconsolata', monospace;
-            background-color: #0a0a0a; /* Darker background */
-            color: #00ff00; /* Bright green text */
+            background-color: #0a0a0a;
+            color: #00ff00;
         }
-        
-        /* Custom styles for loading spinner */
         .spinner {
             border: 4px solid rgba(0, 255, 0, 0.3);
             border-radius: 50%;
-            border-top: 4px solid #00ff00; /* Bright green */
+            border-top: 4px solid #00ff00;
             width: 24px;
             height: 24px;
             animation: spin 1s linear infinite;
@@ -37,62 +28,46 @@
             0% { transform: rotate(0deg); }
             100% { transform: rotate(360deg); }
         }
-
-        /* Custom styles for message box */
         #message-box {
             transition: all 0.3s ease-in-out;
         }
-
-        /* Ensure lucide icons are sized correctly and colored */
         .lucide {
             width: 16px;
             height: 16px;
             stroke-width: 2;
         }
-
-        /* Glow effect for headers */
         h1, h2 {
             text-shadow: 0 0 5px #00ff00;
         }
-
-        /* Style for the auth toggle link */
         .auth-toggle {
             color: #00ff00;
             text-decoration: underline;
             cursor: pointer;
         }
-
-        /* Typewriter effect for title */
         .typewriter-effect {
-            width: 15ch; /* 15 chars for "QuickSync Clip" */
+            width: 15ch;
             overflow: hidden;
             white-space: nowrap;
             border-right: .1em solid #00ff00;
             animation: typing 2.5s steps(15), blink-caret .75s step-end infinite;
         }
-        
         @keyframes typing {
             from { width: 0 }
             to { width: 15ch }
         }
-
         @keyframes blink-caret {
             from, to { border-color: transparent }
             50% { border-color: #00ff00; }
         }
-
-        /* Custom style for text history items */
         .history-item {
-            word-break: break-all; /* Break long words/links */
+            word-break: break-all;
         }
-
-        /* QR Code Canvas */
         #upload-qr-code {
-            border: 4px solid #00ff00; /* Green border */
+            border: 4px solid #00ff00;
             background: white;
+            width: 160px;
+            height: 160px;
         }
-
-        /* Progress Bar */
         #progress-bar-container {
             width: 100%;
             background-color: #1a1a1a;
@@ -101,22 +76,15 @@
         #progress-bar {
             width: 0%;
             height: 10px;
-            background-color: #00ff00; /* Bright green */
+            background-color: #00ff00;
             transition: width 0.1s linear;
         }
-
     </style>
 </head>
 <body class="min-h-screen flex items-center justify-center p-4">
 
-    <!-- 
-      App Wrapper 
-    -->
     <div class="w-full max-w-2xl">
-
-        <!-- 
-          Login/Register Screen 
-        -->
+        
         <div id="auth-container" class="bg-black p-8 shadow-xl border border-lime-900">
             <h1 class="typewriter-effect text-3xl font-bold text-center mb-2 text-lime-300 mx-auto">QuickSync Clip</h1>
             <p id="auth-subtitle" class="text-center text-lime-600 mb-6">Log in to access your secure clipboard.</p>
@@ -128,16 +96,12 @@
                 </button>
             </div>
             <p class="text-center mt-4 text-lime-600">
-                <span id="auth-prompt">Need an account?</span>
-                <a href="#" id="auth-toggle-link" class="auth-toggle">Register here</a>
+                <span id="auth-prompt"></span>
+                <a href="#" id="auth-toggle-link" class="auth-toggle"></a>
             </p>
         </div>
 
-        <!-- 
-          Main App Screen (Hidden by default)
-        -->
         <div id="app-container" class="hidden">
-            <!-- Header -->
             <div class="flex justify-between items-center mb-4">
                 <h1 class="typewriter-effect text-2xl font-bold text-lime-300" style="margin: 0; width: 15ch;">QuickSync Clip</h1>
                 <button id="logout-button" class="text-sm text-lime-600 hover:text-lime-300 transition">
@@ -145,10 +109,8 @@
                 </button>
             </div>
 
-            <!-- Message Box for errors/info -->
             <div id="message-box" class="hidden p-3 mb-4 text-sm border"></div>
 
-            <!-- New Text Sync Area -->
             <div class="bg-black p-6 shadow-xl mb-6 border border-lime-900">
                 <h2 class="text-lg font-semibold mb-3 text-lime-300">Sync New Text</h2>
                 <textarea id="new-text-input" class="w-full h-24 p-3 bg-gray-900 border border-lime-800 text-lime-300 placeholder-lime-700 resize-none focus:outline-none focus:ring-2 focus:ring-lime-500 focus:border-lime-500" placeholder="Paste text here to sync..."></textarea>
@@ -158,19 +120,14 @@
                 </button>
             </div>
 
-            <!-- Synced Text History -->
             <div class="bg-black p-6 shadow-xl mb-6 border border-lime-900">
                 <h2 class="text-lg font-semibold mb-3 text-lime-300">Synced History (Newest First)</h2>
                 <div id="text-history-container" class="space-y-3">
-                    <!-- Text history items will be dynamically inserted here -->
                 </div>
             </div>
 
-
-            <!-- File Upload and List -->
             <div class="bg-black p-6 shadow-xl border border-lime-900">
                 <h2 class="text-lg font-semibold mb-3 text-lime-300">Synced Files (via Gofile)</h2>
-                <!-- File Upload Input -->
                 <label for="file-upload" class="w-full bg-lime-900 border border-lime-700 hover:bg-lime-700 text-lime-300 hover:text-black font-bold py-3 px-4 transition duration-200 flex items-center justify-center space-x-2 cursor-pointer">
                     <i data-lucide="upload-cloud"></i>
                     <span>Upload New File</span>
@@ -178,19 +135,15 @@
                 <input type="file" id="file-upload" class="hidden">
                 <p class="text-xs text-lime-700 mt-2 text-center">Files are hosted on Gofile and expire after ~7 days.</p>
                 
-                <!-- Upload Progress & Result -->
                 <div id="upload-status" class="hidden mt-4 space-y-3">
-                    <!-- Progress Bar -->
                     <div id="progress-bar-container">
                         <div id="progress-bar"></div>
                     </div>
-                    <!-- Progress Stats -->
                     <div id="progress-stats" class="flex justify-between text-xs text-lime-400">
                         <span id="progress-percent">0%</span>
                         <span id="progress-speed">-- MB/s</span>
                         <span id="progress-eta">--:--</span>
                     </div>
-                    <!-- Upload Result: Link & QR -->
                     <div id="upload-result" class="hidden pt-4 border-t border-lime-900 space-y-3">
                         <h3 class="text-sm font-semibold text-lime-300">Upload Complete!</h3>
                         <a id="upload-link" href="#" target="_blank" class="block text-lime-400 hover:underline truncate"></a>
@@ -199,59 +152,59 @@
                     </div>
                 </div>
 
-                <!-- File List -->
                 <div id="file-list" class="mt-6 space-y-3">
-                    <!-- Files will be dynamically inserted here -->
                 </div>
             </div>
         </div>
-
     </div>
 
-    <!-- 
-      Supabase and App Logic 
-    -->
+    <div id="file-name-modal-overlay" class="hidden fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center p-4 z-40">
+        <div id="file-name-modal" class="bg-black p-6 shadow-xl border border-lime-900 w-full max-w-sm z-50">
+            <h3 class="text-lg font-semibold mb-4 text-lime-300">Name Your File</h3>
+            <p class="text-sm text-lime-600 mb-3">Enter a name for this upload:</p>
+            <input type="text" id="file-name-input" class="w-full p-3 bg-gray-900 border border-lime-800 text-lime-300 placeholder-lime-700 focus:outline-none focus:ring-2 focus:ring-lime-500 focus:border-lime-500">
+            <div class="flex space-x-3 mt-4">
+                <button id="file-name-cancel-button" class="w-full bg-gray-800 border border-gray-600 hover:bg-gray-600 text-lime-300 hover:text-black font-semibold py-2 px-4 transition duration-200">
+                    Cancel
+                </button>
+                <button id="file-name-confirm-button" class="w-full bg-lime-900 border border-lime-700 hover:bg-lime-700 text-lime-300 hover:text-black font-semibold py-2 px-4 transition duration-200">
+                    Confirm
+                </button>
+            </div>
+        </div>
+    </div>
+
     <script type="module">
         // --- Supabase Configuration ---
-        // These are your project keys.
         const supabaseUrl = 'https://ljesaaheerbxtkenoiug.supabase.co';
         const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxqZXNhYWhlZXJieHRrZW5vaXVnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjIxMDgyNzIsImV4cCI6MjA3NzY4NDI3Mn0.sLMbA51U0CMqvD7Xhgaln6OatbZJdenl0CDuUWg6fTY';
-        
-        // Initialize Supabase client
-        const { createClient } = supabase; // This line was fixed
+        const { createClient } = supabase;
         const _supabase = createClient(supabaseUrl, supabaseAnonKey);
 
         // --- Global State ---
         let currentUser = null;
-        let authMode = 'login'; // 'login' or 'register'
+        let authMode = 'login';
         let textClipsSubscription = null;
         let fileLinksSubscription = null;
-
+        let fileToUpload = null;
+        
         // --- DOM Elements ---
         let authContainer, appContainer, authButton, logoutButton, emailInput, passwordInput,
             authSubtitle, messageBox, newTextInput, syncTextButton, textHistoryContainer,
             fileUploadInput, fileListContainer, authPrompt, authToggleLink,
             uploadStatus, progressBarContainer, progressBar, progressPercent,
-            progressSpeed, progressEta, uploadResult, uploadLink, uploadQrCanvas, uploadDismissButton;
+            progressSpeed, progressEta, uploadResult, uploadLink, uploadQrCanvas, uploadDismissButton,
+            fileNameModalOverlay, fileNameInput, fileNameConfirmButton, fileNameCancelButton;
 
-        // --- QR Code Generator ---
-        const QrCode = qrcodegen.QrCode;
 
         // --- Helper Functions ---
-
-        /**
-         * Initialize Lucide icons
-         */
         function initIcons() {
             lucide.createIcons();
         }
 
-        /**
-         * Show a message to the user
-         */
         function showMessage(message, type = 'info') {
             if (!messageBox) return;
-            messageBox.textContent = message.replace('Error: ', ''); // Make errors user-friendly
+            messageBox.textContent = message.replace('Error: ', '');
             messageBox.classList.remove('hidden', 'bg-red-900', 'border-red-600', 'text-red-400', 'bg-green-900', 'border-green-600', 'text-green-400', 'bg-blue-900', 'border-blue-600', 'text-blue-400');
             
             if (type === 'error') {
@@ -271,25 +224,19 @@
             }, 5000);
         }
 
-        /**
-         * Switch between login and app screens
-         */
         function showScreen(screenName) {
             if (!authContainer || !appContainer) return;
             if (screenName === 'app') {
                 authContainer.classList.add('hidden');
                 appContainer.classList.remove('hidden');
-                if (messageBox) messageBox.classList.add('hidden'); // Hide any auth messages
+                if (messageBox) messageBox.classList.add('hidden');
             } else {
                 appContainer.classList.add('hidden');
                 authContainer.classList.remove('hidden');
-                if (passwordInput) passwordInput.value = ''; // Clear password on logout/show
+                if (passwordInput) passwordInput.value = '';
             }
         }
 
-        /**
-         * Toggles the auth form between Login and Register
-         */
         function toggleAuthMode() {
             if (authMode === 'login') {
                 authMode = 'register';
@@ -306,9 +253,6 @@
             }
         }
 
-        /**
-         * Formats seconds into MM:SS
-         */
         function formatTime(seconds) {
             if (!isFinite(seconds) || seconds < 0) return '--:--';
             const m = Math.floor(seconds / 60);
@@ -316,40 +260,31 @@
             return `${m}:${s < 10 ? '0' : ''}${s}`;
         }
 
-        /**
-         * Formats bytes into MB/s
-         */
         function formatSpeed(bytesPerSecond) {
             if (!isFinite(bytesPerSecond) || bytesPerSecond < 0) return '-- MB/s';
             const mbps = bytesPerSecond / 1024 / 1024;
             return `${mbps.toFixed(2)} MB/s`;
         }
         
-        /**
-         * Draws a QR code to a canvas element
-         */
         function drawQrCode(url, canvas) {
+            if (typeof QRCode === 'undefined') { 
+                console.warn("QR Code library (QRCode.js) not loaded. Skipping QR code generation.");
+                canvas.classList.add('hidden');
+                return;
+            }
             try {
-                const qr = QrCode.encodeText(url, QrCode.Ecc.MEDIUM);
-                const scale = 4;
-                const border = 2;
-                canvas.width = (qr.size + border * 2) * scale;
-                canvas.height = canvas.width;
-                const ctx = canvas.getContext("2d");
-                
-                // Fill background
-                ctx.fillStyle = "#ffffff";
-                ctx.fillRect(0, 0, canvas.width, canvas.height);
-                
-                // Draw modules
-                ctx.fillStyle = "#0a0a0a"; // Dark module color
-                for (let y = 0; y < qr.size; y++) {
-                    for (let x = 0; x < qr.size; x++) {
-                        if (qr.getModule(x, y)) {
-                            ctx.fillRect((x + border) * scale, (y + border) * scale, scale, scale);
-                        }
+                canvas.classList.remove('hidden');
+                QRCode.toCanvas(canvas, url, {
+                    width: 160,
+                    margin: 2,
+                    color: {
+                        dark: '#0a0a0a',
+                        light: '#ffffff'
                     }
-                }
+                }, function (error) {
+                    if (error) throw error;
+                    console.log('QR code generated!');
+                });
             } catch (e) {
                 console.error("QR Code generation failed:", e);
                 canvas.classList.add('hidden');
@@ -357,11 +292,8 @@
         }
 
         // --- Auth Logic ---
-
-        /**
-         * Handles the Login/Register process
-         */
         async function handleAuth() {
+            console.log("handleAuth: Attempting auth...");
             const email = emailInput.value;
             const password = passwordInput.value;
             
@@ -380,8 +312,10 @@
             try {
                 let response;
                 if (authMode === 'login') {
+                    console.log("handleAuth: Mode: login");
                     response = await _supabase.auth.signInWithPassword({ email, password });
                 } else {
+                    console.log("handleAuth: Mode: register");
                     response = await _supabase.auth.signUp({ email, password });
                     if (response.error) throw response.error;
                     if (response.data.user && response.data.user.identities.length === 0) {
@@ -390,12 +324,12 @@
                         showMessage('Registration successful! Please check your email to confirm your account.', 'success');
                     }
                 }
+                
+                console.log("handleAuth: Login response", response);
 
                 if (response.error) {
                     throw response.error;
                 }
-                
-                // onAuthStateChanged will handle switching screens
             
             } catch (error) {
                 console.error("Auth Error:", error);
@@ -406,24 +340,19 @@
             }
         }
 
-        /**
-         * Handles the logout process
-         */
         async function handleLogout() {
             try {
                 await _supabase.auth.signOut();
-                // onAuthStateChanged will handle cleanup
             } catch (error) {
                  console.error("Logout Error:", error);
                  showMessage(error.message, 'error');
             }
         }
 
-        /**
-         * Main auth state listener
-         */
         function setupAuthListener() {
+            console.log("setupAuthListener: Attaching listener...");
             _supabase.auth.onAuthStateChange((event, session) => {
+                console.log("onAuthStateChange Fired:", event, session);
                 if (event === 'SIGNED_IN' && session) {
                     currentUser = session.user;
                     showScreen('app');
@@ -440,14 +369,9 @@
         }
 
         // --- Realtime and Data Logic ---
-
-        /**
-         * Fetches all current clips and files once on load
-         */
         async function fetchInitialData() {
             if (!currentUser) return;
 
-            // Fetch Text Clips
             try {
                 const { data: clips, error } = await _supabase
                     .from('clips')
@@ -462,7 +386,6 @@
                 showMessage("Could not load text clips.", "error");
             }
 
-            // Fetch Files
             try {
                 const { data: files, error } = await _supabase
                     .from('files')
@@ -478,41 +401,33 @@
             }
         }
 
-        /**
-         * Listens for any new/deleted clips and files in real-time
-         */
         function setupRealtimeSubscriptions() {
             if (!currentUser) return;
             cleanupSubscriptions();
 
-            // Listen for text clips
             textClipsSubscription = _supabase
                 .channel('public:clips')
                 .on('postgres_changes', 
                     { event: '*', schema: 'public', table: 'clips', filter: `user_id=eq.${currentUser.id}` },
                     (payload) => {
                         console.log('Realtime clip change:', payload);
-                        fetchInitialData(); // Just re-fetch all data on any change
+                        fetchInitialData();
                     }
                 )
                 .subscribe();
             
-            // Listen for file links
             fileLinksSubscription = _supabase
                 .channel('public:files')
                 .on('postgres_changes', 
                     { event: '*', schema: 'public', table: 'files', filter: `user_id=eq.${currentUser.id}` },
                     (payload) => {
                         console.log('Realtime file change:', payload);
-                        fetchInitialData(); // Just re-fetch all data on any change
+                        fetchInitialData();
                     }
                 )
                 .subscribe();
         }
 
-        /**
-         * Removes all realtime listeners
-         */
         function cleanupSubscriptions() {
             if (textClipsSubscription) {
                 _supabase.removeChannel(textClipsSubscription);
@@ -525,10 +440,6 @@
         }
 
         // --- Text Clip Functions ---
-
-        /**
-         * Renders the list of text clips
-         */
         function renderTexts(clips) {
             if (!textHistoryContainer) return;
             textHistoryContainer.innerHTML = '';
@@ -557,7 +468,7 @@
                         navigator.clipboard.writeText(clip.content).then(() => {
                             showMessage('Copied to clipboard!', 'success');
                         }, () => {
-                            fallbackCopyTextToClipboard(clip.content); // Fallback
+                            fallbackCopyTextToClipboard(clip.content);
                         });
                     } catch (e) {
                          fallbackCopyTextToClipboard(clip.content);
@@ -576,7 +487,7 @@
                 textHistoryContainer.appendChild(item);
             });
 
-            initIcons(); // Re-initialize icons
+            initIcons();
         }
         
         function fallbackCopyTextToClipboard(text) {
@@ -598,9 +509,6 @@
             }
         }
 
-        /**
-         * Saves a new text clip to Supabase
-         */
         async function handleSyncNewText() {
             const newText = newTextInput.value;
             if (newText.trim().length === 0) {
@@ -619,9 +527,8 @@
                 
                 if (error) throw error;
                 
-                newTextInput.value = ''; // Clear input
+                newTextInput.value = '';
                 showMessage("Text synced!", "success");
-                // Realtime listener will handle rendering
 
             } catch (error) {
                 console.error("Error syncing text:", error);
@@ -633,11 +540,7 @@
             }
         }
 
-        /**
-         * Deletes a text clip from Supabase
-         */
         async function handleDeleteClip(clipId) {
-            // Use a simple confirm dialog for this UI
             if (!confirm("Are you sure you want to delete this text clip?")) {
                 return;
             }
@@ -650,7 +553,6 @@
                 
                 if (error) throw error;
                 showMessage("Text clip deleted.", "success");
-                // Realtime listener will handle rendering
 
             } catch (error) {
                 console.error("Error deleting clip:", error);
@@ -659,13 +561,9 @@
         }
 
         // --- File Link Functions ---
-
-        /**
-         * Renders the list of file links
-         */
         function renderFiles(files) {
             if (!fileListContainer) return;
-            fileListContainer.innerHTML = ''; // Clear existing list
+            fileListContainer.innerHTML = '';
             
             if (!files || files.length === 0) {
                 fileListContainer.innerHTML = '<p class="text-sm text-lime-700 text-center">No files synced yet.</p>';
@@ -676,27 +574,34 @@
                 const fileElement = document.createElement('div');
                 fileElement.className = 'bg-gray-900 p-3 border-b border-lime-900 flex justify-between items-center';
                 
+                const infoDiv = document.createElement('div');
+                infoDiv.className = 'truncate mr-4 flex-1 min-w-0';
+
+                const nameEl = document.createElement('div');
+                nameEl.className = 'text-lime-300 font-bold truncate';
+                nameEl.textContent = file.file_name;
+
                 const link = document.createElement('a');
                 link.href = file.file_url;
                 link.target = '_blank';
-                link.className = 'text-lime-400 hover:underline truncate mr-4';
-                link.textContent = file.file_name;
+                link.className = 'text-lime-400 hover:underline truncate text-sm block';
+                link.textContent = file.file_url;
+
+                infoDiv.appendChild(nameEl);
+                infoDiv.appendChild(link);
 
                 const deleteButton = document.createElement('button');
                 deleteButton.className = 'text-red-600 hover:text-red-400 flex-shrink-0';
                 deleteButton.innerHTML = '<i data-lucide="trash-2" class="w-4 h-4"></i>';
                 deleteButton.onclick = () => handleDeleteFile(file.id);
                 
-                fileElement.appendChild(link);
+                fileElement.appendChild(infoDiv);
                 fileElement.appendChild(deleteButton);
                 fileListContainer.appendChild(fileElement);
             });
-            initIcons(); // Re-initialize icons
+            initIcons();
         }
 
-        /**
-         * Resets and hides the upload progress UI
-         */
         function resetUploadUI() {
             uploadStatus.classList.add('hidden');
             uploadResult.classList.add('hidden');
@@ -706,23 +611,56 @@
             progressEta.textContent = '--:--';
             uploadLink.href = '#';
             uploadLink.textContent = '';
-            uploadQrCanvas.getContext('2d').clearRect(0, 0, uploadQrCanvas.width, uploadQrCanvas.height);
-            fileUploadInput.value = ''; // Reset input
+            if (uploadQrCanvas) {
+                const ctx = uploadQrCanvas.getContext('2d');
+                if (ctx) {
+                    ctx.clearRect(0, 0, uploadQrCanvas.width, uploadQrCanvas.height);
+                }
+            }
         }
 
-        /**
-         * Handles uploading a file to Gofile and saving the link to Supabase
-         */
         async function handleFileUpload(e) {
             const file = e.target.files[0];
             if (!file || !currentUser) return;
 
-            // Show and reset progress bar
+            fileToUpload = file;
+            fileNameInput.value = file.name;
+            fileNameModalOverlay.classList.remove('hidden');
+            fileNameInput.focus();
+            fileNameInput.select();
+            
+            e.target.value = ''; 
+        }
+
+        function cancelFileUpload() {
+            fileNameModalOverlay.classList.add('hidden');
+            fileToUpload = null;
+            fileNameInput.value = '';
+            showMessage("File upload cancelled.", "info");
+        }
+
+        function confirmFileUpload() {
+            const fileName = fileNameInput.value;
+            if (!fileName || fileName.trim() === "") {
+                showMessage("Please enter a valid file name.", "error");
+                return;
+            }
+
+            if (fileToUpload) {
+                uploadFile(fileToUpload, fileName.trim());
+            }
+
+            fileNameModalOverlay.classList.add('hidden');
+            fileToUpload = null;
+            fileNameInput.value = '';
+        }
+
+        async function uploadFile(file, fileName) {
             uploadStatus.classList.remove('hidden');
             uploadResult.classList.add('hidden');
             progressBar.style.width = '0%';
             progressPercent.textContent = '0%';
-            showMessage('Uploading file to Gofile...', 'info');
+            showMessage(`Uploading "${fileName}" to Gofile...`, 'info');
 
             try {
                 const formData = new FormData();
@@ -753,24 +691,25 @@
                                 throw new Error(`File upload failed: ${uploadData.data.error || 'Unknown error'}`);
                             }
 
-                            // Show link and QR code immediately
                             const downloadUrl = uploadData.data.downloadPage;
                             uploadLink.href = downloadUrl;
                             uploadLink.textContent = downloadUrl;
                             drawQrCode(downloadUrl, uploadQrCanvas);
                             uploadResult.classList.remove('hidden');
 
-                            // Save link to Supabase
                             const newFile = {
-                                file_name: uploadData.data.fileName,
+                                file_name: fileName,
                                 file_url: downloadUrl,
                                 user_id: currentUser.id
                             };
+
                             const { error } = await _supabase.from('files').insert(newFile);
-                            if (error) throw error;
+                            if (error) {
+                                console.error("Supabase insert error:", error);
+                                throw new Error(`Failed to save link. Check RLS policies for 'files' table. (${error.message})`);
+                            }
                             
                             showMessage('File uploaded and link synced!', 'success');
-                            // Realtime will handle rendering to the persistent list
 
                         } catch (parseError) {
                             console.error('File upload parse error:', parseError);
@@ -793,14 +732,10 @@
             } catch (error) {
                 console.error('File upload error:', error);
                 showMessage(`${error.message}`, 'error');
-                resetUploadUI(); // Hide progress on failure
+                resetUploadUI();
             }
         }
 
-
-        /**
-         * Deletes a file link from Supabase
-         */
         async function handleDeleteFile(fileId) {
             if (!confirm("Are you sure you want to delete this file link?")) {
                 return;
@@ -814,7 +749,6 @@
                 
                 if (error) throw error;
                 showMessage("File link deleted.", "success");
-                // Realtime listener will handle rendering
 
             } catch (error) {
                 console.error("Error deleting file link:", error);
@@ -823,10 +757,6 @@
         }
 
         // --- Initialization ---
-
-        /**
-         * Assigns all DOM elements to variables
-         */
         function assignDOMElements() {
             authContainer = document.getElementById('auth-container');
             appContainer = document.getElementById('app-container');
@@ -844,7 +774,6 @@
             authPrompt = document.getElementById('auth-prompt');
             authToggleLink = document.getElementById('auth-toggle-link');
             
-            // Upload UI
             uploadStatus = document.getElementById('upload-status');
             progressBarContainer = document.getElementById('progress-bar-container');
             progressBar = document.getElementById('progress-bar');
@@ -855,22 +784,21 @@
             uploadLink = document.getElementById('upload-link');
             uploadQrCanvas = document.getElementById('upload-qr-code');
             uploadDismissButton = document.getElementById('upload-dismiss-button');
+            
+            fileNameModalOverlay = document.getElementById('file-name-modal-overlay');
+            fileNameInput = document.getElementById('file-name-input');
+            fileNameConfirmButton = document.getElementById('file-name-confirm-button');
+            fileNameCancelButton = document.getElementById('file-name-cancel-button');
         }
 
-        /**
-         * Main function to initialize the app
-         */
         async function main() {
             try {
-                // First, assign DOM elements
                 assignDOMElements();
 
-                // Check if all elements were found
                 if (!authContainer || !appContainer || !authButton || !logoutButton) {
                     throw new Error("Core DOM elements not found. Check your HTML IDs.");
                 }
 
-                // Attach event listeners
                 authButton.addEventListener('click', handleAuth);
                 logoutButton.addEventListener('click', handleLogout);
                 authToggleLink.addEventListener('click', (e) => {
@@ -881,14 +809,20 @@
                 fileUploadInput.addEventListener('change', handleFileUpload);
                 uploadDismissButton.addEventListener('click', resetUploadUI);
                 
-                // Set up the main auth listener
-                setupAuthListener();
+                fileNameConfirmButton.addEventListener('click', confirmFileUpload);
+                fileNameCancelButton.addEventListener('click', cancelFileUpload);
+                fileNameInput.addEventListener('keydown', (e) => {
+                    if (e.key === 'Enter') {
+                        e.preventDefault();
+                        confirmFileUpload();
+                    }
+                });
 
-                // Initialize icons
+                setupAuthListener();
                 initIcons();
 
-                // Check initial auth state (in case user is already logged in)
                 const { data: { session } } = await _supabase.auth.getSession();
+                console.log("Initial session check:", session);
                 if (session) {
                     currentUser = session.user;
                     showScreen('app');
@@ -904,7 +838,6 @@
             }
         }
 
-        // Wait for the DOM to be fully loaded before running the main app logic
         document.addEventListener('DOMContentLoaded', main);
 
     </script>
