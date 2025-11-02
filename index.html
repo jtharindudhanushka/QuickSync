@@ -105,7 +105,7 @@
                     Log In
                 </button>
             </div>
-
+            <!-- Removed the 'Register here' link -->
         </div>
 
         <!-- 
@@ -180,7 +180,7 @@
         import { 
             getAuth, 
             onAuthStateChanged,
-            createUserWithEmailAndPassword,
+            // createUserWithEmailAndPassword, // Removed
             signInWithEmailAndPassword,
             signOut
         } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
@@ -226,8 +226,7 @@
         const passwordInput = document.getElementById('password-input');
         
         const authSubtitle = document.getElementById('auth-subtitle');
-        const authToggleText = document.getElementById('auth-toggle-text');
-        const authToggleLink = document.getElementById('auth-toggle-link');
+        // Removed authToggleText and authToggleLink
         
         const messageBox = document.getElementById('message-box');
         
@@ -240,7 +239,7 @@
         const uploadLoader = document.getElementById('upload-loader');
         const fileListContainer = document.getElementById('file-list');
 
-        let isRegisterMode = false;
+        // let isRegisterMode = false; // Removed
 
         // --- Crypto Helper Functions ---
 
@@ -367,20 +366,7 @@
         /**
          * Toggles between Login and Register modes
          */
-        function toggleAuthMode() {
-            isRegisterMode = !isRegisterMode;
-            if (isRegisterMode) {
-                authSubtitle.textContent = "Create an account to use your secure clipboard.";
-                authButton.textContent = "Register";
-                authToggleText.textContent = "Already have an account?";
-                authToggleLink.textContent = "Log in here.";
-            } else {
-                authSubtitle.textContent = "Log in to access your secure clipboard.";
-                authButton.textContent = "Log In";
-                authToggleText.textContent = "Need an account?";
-                authToggleLink.textContent = "Register here.";
-            }
-        }
+        // Removed toggleAuthMode function
 
         /**
          * Get the Firestore document reference for the current user's clipboard
@@ -413,13 +399,8 @@
             authButton.textContent = "Connecting...";
 
             try {
-                let userCredential;
-                if (isRegisterMode) {
-                    userCredential = await createUserWithEmailAndPassword(auth, email, password);
-                    showMessage('Account created successfully! Logging in...', 'success');
-                } else {
-                    userCredential = await signInWithEmailAndPassword(auth, email, password);
-                }
+                // Simplified auth logic: only login
+                const userCredential = await signInWithEmailAndPassword(auth, email, password);
 
                 // SUCCESS: Derive key and proceed to app
                 encryptionKey = await deriveKey(password, email);
@@ -430,10 +411,15 @@
 
             } catch (error) {
                 console.error("Auth Error:", error);
-                showMessage(error.message, 'error');
+                // Custom error for users
+                if (error.code === 'auth/invalid-credential' || error.code === 'auth/user-not-found') {
+                    showMessage('Invalid credentials. Please check your email and password.', 'error');
+                } else {
+                    showMessage(error.message, 'error');
+                }
             } finally {
                 authButton.disabled = false;
-                authButton.textContent = isRegisterMode ? "Register" : "Log In";
+                authButton.textContent = "Log In"; // Simplified
             }
         }
 
@@ -890,7 +876,7 @@
 
                 // Attach event listeners
                 authButton.addEventListener('click', handleAuth);
-                authToggleLink.addEventListener('click', toggleAuthMode);
+                // authToggleLink.addEventListener('click', toggleAuthMode); // Removed
                 logoutButton.addEventListener('click', handleLogout);
                 
                 syncTextButton.addEventListener('click', handleSyncNewText);
@@ -910,7 +896,10 @@
             }
         }
 
-        main();
+        // main(); // Removed immediate call
+
+        // Wait for the DOM to be fully loaded before running the main app logic
+        document.addEventListener('DOMContentLoaded', main);
 
     </script>
 </body>
