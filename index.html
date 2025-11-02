@@ -19,8 +19,6 @@
             color: #00ff00; /* Bright green text */
         }
         
-        /* Removed the scanline effect */
-
         /* Custom styles for loading spinner */
         .spinner {
             border: 4px solid rgba(0, 255, 0, 0.3);
@@ -218,28 +216,9 @@
         const TEXTS_PER_PAGE = 5;
 
         // --- DOM Elements ---
-        const authContainer = document.getElementById('auth-container');
-        const appContainer = document.getElementById('app-container');
-        const authButton = document.getElementById('auth-button');
-        const logoutButton = document.getElementById('logout-button');
-        const emailInput = document.getElementById('email-input');
-        const passwordInput = document.getElementById('password-input');
-        
-        const authSubtitle = document.getElementById('auth-subtitle');
-        // Removed authToggleText and authToggleLink
-        
-        const messageBox = document.getElementById('message-box');
-        
-        const newTextInput = document.getElementById('new-text-input');
-        const syncTextButton = document.getElementById('sync-text-button');
-        const textHistoryContainer = document.getElementById('text-history-container');
-        const loadMoreTextsButton = document.getElementById('load-more-texts');
-        
-        const fileUploadInput = document.getElementById('file-upload');
-        const uploadLoader = document.getElementById('upload-loader');
-        const fileListContainer = document.getElementById('file-list');
-
-        // let isRegisterMode = false; // Removed
+        let authContainer, appContainer, authButton, logoutButton, emailInput, passwordInput,
+            authSubtitle, messageBox, newTextInput, syncTextButton, textHistoryContainer,
+            loadMoreTextsButton, fileUploadInput, uploadLoader, fileListContainer;
 
         // --- Crypto Helper Functions ---
 
@@ -328,6 +307,7 @@
          * Show a message to the user
          */
         function showMessage(message, type = 'info') {
+            if (!messageBox) return;
             messageBox.textContent = message.replace('Firebase: ', ''); // Make errors user-friendly
             messageBox.classList.remove('hidden', 'bg-red-900', 'border-red-600', 'text-red-400', 'bg-green-900', 'border-green-600', 'text-green-400', 'bg-blue-900', 'border-blue-600', 'text-blue-400');
             
@@ -342,7 +322,7 @@
             messageBox.classList.remove('hidden');
             
             setTimeout(() => {
-                if (!messageBox.classList.contains('hidden')) {
+                if (messageBox && !messageBox.classList.contains('hidden')) {
                      messageBox.classList.add('hidden');
                 }
             }, 5000);
@@ -352,21 +332,17 @@
          * Switch between login and app screens
          */
         function showScreen(screenName) {
+            if (!authContainer || !appContainer) return;
             if (screenName === 'app') {
                 authContainer.classList.add('hidden');
                 appContainer.classList.remove('hidden');
-                messageBox.classList.add('hidden'); // Hide any auth messages
+                if (messageBox) messageBox.classList.add('hidden'); // Hide any auth messages
             } else {
                 appContainer.classList.add('hidden');
                 authContainer.classList.remove('hidden');
-                passwordInput.value = ''; // Clear password on logout/show
+                if (passwordInput) passwordInput.value = ''; // Clear password on logout/show
             }
         }
-
-        /**
-         * Toggles between Login and Register modes
-         */
-        // Removed toggleAuthMode function
 
         /**
          * Get the Firestore document reference for the current user's clipboard
@@ -377,10 +353,22 @@
             return doc(db, `artifacts/${appId}/private_clipboards/${userId}`);
         }
 
+        /**
+         * A helper to check for Firestore permission errors.
+         */
+        function handleFirestoreError(error, context) {
+            console.error(`${context} Error:`, error);
+            if (error.code === 'permission-denied') {
+                showMessage(`${context} Error: Permission Denied. Please check your Firestore rules.`, 'error');
+            } else {
+                showMessage(`${context} Error: ${error.message}`, 'error');
+            }
+        }
+
         // --- App Logic ---
 
         /**
-         * Handles the Login/Register process
+         * Handles the Login process
          */
         async function handleAuth() {
             const email = emailInput.value;
@@ -486,9 +474,10 @@
                     showMessage('New secure clipboard ready. Start pasting!', 'info');
                 }
             }, (error) => {
-                console.error("Error listening to clipboard:", error);
-                showMessage('Error connecting to clipboard.', 'error');
-                handleLogout();
+                handleFirestoreError(error, "Clipboard Listen");
+                if (error.code === 'permission-denied') {
+                    handleLogout(); // Log out if we can't even read our data
+                }
             });
         }
 
@@ -497,6 +486,7 @@
          * @param {boolean} reset - If true, clears the list and starts from page 1.
          */
         function renderTexts(reset = false) {
+            if (!textHistoryContainer || !loadMoreTextsButton) return;
             if (reset) {
                 textHistoryContainer.innerHTML = '';
                 displayedTextCount = 0;
@@ -581,6 +571,7 @@
          * Renders the list of files
          */
         function renderFiles(files) {
+            if (!fileListContainer) return;
             fileListContainer.innerHTML = ''; // Clear existing list
             if (files.length === 0) {
                 fileListContainer.innerHTML = '<p class="text-sm text-lime-700 text-center">No files synced yet.</p>';
@@ -616,18 +607,23 @@
             const docRef = getClipboardDocRef();
             if (!docRef || !encryptionKey) return [];
             
-            const docSnap = await getDoc(docRef);
-            if (docSnap.exists() && docSnap.data().texts) {
-                try {
-                    const decryptedTextsJson = await decrypt(docSnap.data().texts, encryptionKey);
-                    return JSON.parse(decryptedTextsJson || "[]");
-                } catch (e) {
-                    console.error("Text list decryption failed:", e);
-                    showMessage("Could not read text history.", 'error');
-                    return [];
+            try {
+                const docSnap = await getDoc(docRef);
+                if (docSnap.exists() && docSnap.data().texts) {
+                    try {
+                        const decryptedTextsJson = await decrypt(docSnap.data().texts, encryptionKey);
+                        return JSON.parse(decryptedTextsJson || "[]");
+                    } catch (e) {
+                        console.error("Text list decryption failed:", e);
+                        showMessage("Could not read text history.", 'error');
+                        return [];
+                    }
                 }
+                return [];
+            } catch (error) {
+                handleFirestoreError(error, "Read Texts");
+                return [];
             }
-            return [];
         }
 
         /**
@@ -642,8 +638,7 @@
                 const encryptedTexts = await encrypt(textsJson, encryptionKey);
                 await setDoc(docRef, { texts: encryptedTexts }, { merge: true });
             } catch (error) {
-                console.error("Error saving text list:", error);
-                showMessage("Could not save text list.", 'error');
+                handleFirestoreError(error, "Save Texts");
             }
         }
 
@@ -658,7 +653,7 @@
             }
 
             syncTextButton.disabled = true;
-            syncTextButton.textContent = "Syncing...";
+            syncTextButton.innerHTML = '<div class="spinner"></div>';
 
             try {
                 const currentTexts = await getCurrentTexts();
@@ -671,8 +666,8 @@
                 showMessage("Text synced!", "success");
 
             } catch (error) {
-                console.error("Error syncing text:", error);
-                showMessage("Error syncing text.", "error");
+                // Error is already handled by saveTexts
+                // showMessage("Error syncing text.", "error"); // This is redundant
             } finally {
                 syncTextButton.disabled = false;
                 syncTextButton.innerHTML = '<i data-lucide="send"></i><span>Sync to All Devices</span>';
@@ -687,18 +682,23 @@
             const docRef = getClipboardDocRef();
             if (!docRef || !encryptionKey) return [];
             
-            const docSnap = await getDoc(docRef);
-            if (docSnap.exists() && docSnap.data().files) {
-                try {
-                    const decryptedFilesJson = await decrypt(docSnap.data().files, encryptionKey);
-                    return JSON.parse(decryptedFilesJson || "[]");
-                } catch (e) {
-                    console.error("File list decryption failed:", e);
-                    showMessage("Could not read file list.", 'error');
-                    return [];
+            try {
+                const docSnap = await getDoc(docRef);
+                if (docSnap.exists() && docSnap.data().files) {
+                    try {
+                        const decryptedFilesJson = await decrypt(docSnap.data().files, encryptionKey);
+                        return JSON.parse(decryptedFilesJson || "[]");
+                    } catch (e) {
+                        console.error("File list decryption failed:", e);
+                        showMessage("Could not read file list.", 'error');
+                        return [];
+                    }
                 }
+                return [];
+            } catch (error) {
+                handleFirestoreError(error, "Read Files");
+                return [];
             }
-            return [];
         }
 
         /**
@@ -713,8 +713,7 @@
                 const encryptedFiles = await encrypt(filesJson, encryptionKey);
                 await setDoc(docRef, { files: encryptedFiles }, { merge: true });
             } catch (error) {
-                console.error("Error saving file list:", error);
-                showMessage("Could not save file list.", 'error');
+                handleFirestoreError(error, "Save Files");
             }
         }
 
@@ -730,7 +729,8 @@
 
             try {
                 // 1. Get Gofile server
-                const serverResponse = await fetch('https://api.gofile.io/getServer');
+                // ** FIX: Changed endpoint to /v2/getServer **
+                const serverResponse = await fetch('https://api.gofile.io/v2/getServer');
                 if (!serverResponse.ok) {
                     throw new Error(`Gofile server lookup failed: ${serverResponse.status}`);
                 }
@@ -750,7 +750,7 @@
                 const formData = new FormData();
                 formData.append('file', file);
 
-                const uploadResponse = await fetch(`https://${server}.gofile.io/uploadFile`, {
+                const uploadResponse = await fetch(`https://${server}.gofile.io/v2/uploadFile`, {
                     method: 'POST',
                     body: formData,
                 });
@@ -764,7 +764,6 @@
                 } catch (jsonError) {
                     const textResponse = await uploadResponse.text();
                     console.error("Gofile invalid JSON response:", textResponse);
-                    // This is where the user's error comes from
                     if (textResponse.includes("error-notFound")) {
                         throw new Error('Gofile upload failed: Server error (notFound). Please try again.');
                     }
@@ -805,19 +804,19 @@
             showMessage('Click again to confirm deletion.', 'error');
             
             const deleteButton = event.target.closest('button');
-            if (!deleteButton.dataset.confirmed) {
-                 deleteButton.dataset.confirmed = "true";
-                 deleteButton.onclick = () => {
-                    performDelete(fileUrl);
-                 }
-                 setTimeout(() => {
-                     if(deleteButton) { // Check if element still exists
-                        deleteButton.dataset.confirmed = "false";
-                        deleteButton.onclick = () => handleDeleteFile(fileUrl);
-                     }
-                 }, 3000);
-                 return;
-            }
+            if (!deleteButton || deleteButton.dataset.confirmed === "true") return; // Prevent double-clicks
+
+            deleteButton.dataset.confirmed = "true";
+            deleteButton.onclick = () => {
+                performDelete(fileUrl);
+            };
+
+            setTimeout(() => {
+                if(deleteButton) { // Check if element still exists
+                    deleteButton.dataset.confirmed = "false";
+                    deleteButton.onclick = () => handleDeleteFile(fileUrl);
+                }
+            }, 3000);
         }
         
         async function performDelete(fileUrl) {
@@ -827,18 +826,43 @@
                 await saveFiles(updatedFiles);
                 showMessage('File link removed.', 'success');
             } catch (error) {
-                console.error('Error removing file link:', error);
-                showMessage('Could not remove file link.', 'error');
+                // Error is handled by saveFiles
+                // showMessage('Could not remove file link.', 'error'); // Redundant
             }
         }
 
         // --- Initialization ---
 
         /**
+         * Assigns all DOM elements to variables
+         */
+        function assignDOMElements() {
+            authContainer = document.getElementById('auth-container');
+            appContainer = document.getElementById('app-container');
+            authButton = document.getElementById('auth-button');
+            logoutButton = document.getElementById('logout-button');
+            emailInput = document.getElementById('email-input');
+            passwordInput = document.getElementById('password-input');
+            authSubtitle = document.getElementById('auth-subtitle');
+            messageBox = document.getElementById('message-box');
+            newTextInput = document.getElementById('new-text-input');
+            syncTextButton = document.getElementById('sync-text-button');
+            textHistoryContainer = document.getElementById('text-history-container');
+            loadMoreTextsButton = document.getElementById('load-more-texts');
+            fileUploadInput = document.getElementById('file-upload');
+            uploadLoader = document.getElementById('upload-loader');
+            fileListContainer = document.getElementById('file-list');
+        }
+
+        /**
          * Main function to initialize the app
          */
         async function main() {
             try {
+                // First, assign DOM elements
+                assignDOMElements();
+
+                // Then, initialize Firebase
                 const app = initializeApp(firebaseConfig);
                 db = getFirestore(app);
                 auth = getAuth(app);
@@ -870,18 +894,15 @@
                         allSyncedTexts = [];
                         renderTexts(true);
                         renderFiles([]);
-                        newTextInput.value = '';
+                        if(newTextInput) newTextInput.value = '';
                     }
                 });
 
                 // Attach event listeners
                 authButton.addEventListener('click', handleAuth);
-                // authToggleLink.addEventListener('click', toggleAuthMode); // Removed
                 logoutButton.addEventListener('click', handleLogout);
-                
                 syncTextButton.addEventListener('click', handleSyncNewText);
                 loadMoreTextsButton.addEventListener('click', () => renderTexts(false)); // false = don't reset
-                
                 fileUploadInput.addEventListener('change', handleFileUpload);
                 
                 // Make delete function global for inline onclick
@@ -892,11 +913,9 @@
 
             } catch (error) {
                 console.error("Initialization Error:", error);
-                document.body.innerHTML = `<h1 class="text-red-500 text-center p-8">Error initializing app: ${error.message}</h1>`;
+                document.body.innerHTML = `<h1 class="text-red-500 text-center p-8">Error initializing app: ${error.message}. Make sure all HTML IDs are correct.</h1>`;
             }
         }
-
-        // main(); // Removed immediate call
 
         // Wait for the DOM to be fully loaded before running the main app logic
         document.addEventListener('DOMContentLoaded', main);
